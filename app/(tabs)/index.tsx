@@ -20,12 +20,7 @@ export default function DashboardScreen() {
     totalCommission: 0,
   });
 
-  useEffect(() => {
-    if (user === null) {
-      console.log('Usuário não autenticado. Redirecionando para login...');
-      router.replace('/login');
-    }
-  }, [user]);
+
 
   const handleLogout = async () => {
     try {

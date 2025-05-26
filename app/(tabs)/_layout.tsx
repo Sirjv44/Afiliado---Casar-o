@@ -15,20 +15,6 @@ import { useAuth } from '@/context/AuthContext';
 export default function TabLayout() {
   const { user } = useAuth();
 
-
-
-  // Evita renderização até o redirecionamento ocorrer
-  if (user === null) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={{ marginTop: 10, color: COLORS.text }}>
-          Redirecionando para login...
-        </Text>
-      </View>
-    );
-  }
-
   return (
     <Tabs
       screenOptions={{
