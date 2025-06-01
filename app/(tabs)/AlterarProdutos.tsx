@@ -36,21 +36,27 @@ export default function EditProductsScreen() {
   }, []);
 
   const handleUpdate = async (index: number) => {
-    const supabase = createClient();
-    const product = products[index];
-
+    const product = products[index]; // ← ESTA LINHA FALTAVA
+  
+    const { name, price, stock, description, category, image_url } = product;
+  
+    const parsedPrice = parseFloat(String(price).replace(',', '.'));
+    const parsedStock = parseInt(String(stock), 10);
+  
+    const supabase = createClient(); // ← também precisa garantir isso aqui
+  
     const { error } = await supabase
       .from('products')
       .update({
-        name: product.name,
-        price: product.price,
-        stock: product.stock,
-        description: product.description,
-        category: product.category,
-        image_url: product.image_url,
+        name,
+        price: parsedPrice,
+        stock: parsedStock,
+        description,
+        category,
+        image_url,
       })
       .eq('id', product.id);
-
+  
     if (error) {
       Alert.alert('Erro', 'Não foi possível atualizar o produto.');
     } else {
@@ -58,15 +64,17 @@ export default function EditProductsScreen() {
       setTimeout(() => setSuccessMessage(''), 3000);
     }
   };
+  
 
   const handleChange = (index: number, field: string, value: string) => {
     const newProducts = [...products];
     newProducts[index] = {
       ...newProducts[index],
-      [field]: field === 'price' || field === 'stock' ? Number(value) : value,
+      [field]: value, // mantém como string
     };
     setProducts(newProducts);
   };
+  
 
   const filteredProducts = products.filter((product) =>
     product.name.toLowerCase().includes(searchText.toLowerCase())
@@ -108,9 +116,10 @@ export default function EditProductsScreen() {
           <TextInput
             style={styles.input}
             value={String(product.price)}
-            keyboardType="numeric"
+            keyboardType="default"
             onChangeText={(text) => handleChange(index, 'price', text)}
           />
+
 
           <Text style={styles.label}>Estoque:</Text>
           <TextInput

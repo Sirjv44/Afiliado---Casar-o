@@ -76,10 +76,11 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   image: {
-    height: 180,
     width: '100%',
+    aspectRatio: 1.2, // Ajuste este valor conforme necessário (1.5, 1.3 etc.)
     resizeMode: 'cover',
   },
+  
   categoryBadge: {
     position: 'absolute',
     top: 12,
