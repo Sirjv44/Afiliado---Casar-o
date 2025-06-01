@@ -25,6 +25,7 @@ import {
 } from 'lucide-react-native';
 import { createClient } from '@/lib/supabase';
 import { useLocalSearchParams } from 'expo-router';
+import { useMemo } from 'react';
 
 interface CartItem extends Product {
   quantity: number;
@@ -274,13 +275,22 @@ export default function NewOrderScreen() {
     0
   );
 
-  // Filter products based on search
-  const filteredProducts = products.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      product.description.toLowerCase().includes(searchText.toLowerCase()) ||
-      product.category.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const filteredProducts = useMemo(() => {
+    const search = searchText.toLowerCase();
+    return products.filter((product) => {
+      const name = product.name?.toLowerCase() || '';
+      const description = product.description?.toLowerCase() || '';
+      const category = product.category?.toLowerCase() || '';
+  
+      return (
+        name.includes(search) ||
+        description.includes(search) ||
+        category.includes(search)
+      );
+    });
+  }, [products, searchText]);
+  
+  
 
   const handleAddToCart = (product: Product) => {
     const existingItem = cartItems.find((item) => item.id === product.id);
@@ -502,7 +512,7 @@ export default function NewOrderScreen() {
         />
       </View>
 
-      <ScrollView style={styles.productList}>
+      <ScrollView style={styles.productList} keyboardShouldPersistTaps="handled">
         {filteredProducts.map((product) => (
           <View key={product.id} style={styles.productItem}>
             <Image

@@ -14,18 +14,10 @@ import ProductCard, { Product } from '@/components/ProductCard';
 import { createClient } from '@/lib/supabase';
 import { Search, Filter } from 'lucide-react-native';
 
-const categories = [
-  'Todos',
-  'Massa Muscular',
-  'Proteínas',
-  'Emagrecimento',
-  'Recuperação',
-  'Vitaminas',
-];
-
 export default function CatalogScreen() {
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>(['Todos']);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [searchText, setSearchText] = useState('');
 
@@ -42,6 +34,12 @@ export default function CatalogScreen() {
           console.error('Erro ao buscar produtos:', error.message);
         } else {
           setProducts(data);
+
+          const uniqueCategories = [
+            'Todos',
+            ...Array.from(new Set(data.map((p) => p.category).filter(Boolean))),
+          ];
+          setCategories(uniqueCategories);
         }
       } catch (error) {
         console.error('Erro inesperado:', error);
