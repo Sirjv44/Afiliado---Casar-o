@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+
 import {
   View,
   Text,
@@ -25,7 +25,9 @@ import {
 } from 'lucide-react-native';
 import { createClient } from '@/lib/supabase';
 import { useLocalSearchParams } from 'expo-router';
-import { useMemo } from 'react';
+import { FlatList } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
+
 
 interface CartItem extends Product {
   quantity: number;
@@ -110,7 +112,7 @@ const CustomerInfoForm = ({ handlePreviousStep, handleNextStep }) => {
             <Text style={styles.textareaLabel}>Observações:</Text>
             <TextInput
               style={styles.textarea}
-              placeholder="Instruções especiais para entrega, etc."
+              placeholder="Instruções para entrega, dados para nota fiscal nome e cpf e forma de pagammento."
               placeholderTextColor={COLORS.textSecondary}
               multiline
               numberOfLines={4}
@@ -218,6 +220,138 @@ const OrderReview = ({
   </View>
 );
 
+const ProductSelection = memo(({
+  filteredProducts = [],
+  handleAddToCart,
+  cartItems = [],
+  totalItems,
+  subtotal,
+  handleUpdateQuantity,
+  handleRemoveFromCart,
+  handleNextStep,
+  searchText,
+  setSearchText
+}) => {
+
+  return (
+    <View style={{ paddingHorizontal: 16, paddingBottom: 16, flex: 1 }}>
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar produtos..."
+          placeholderTextColor={COLORS.textSecondary}
+          value={searchText}
+          onChangeText={(text) => requestAnimationFrame(() => setSearchText(text))}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+      </View>
+
+      <FlatList
+        data={filteredProducts}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingBottom: 16 }}
+        keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={
+          <Text style={{ color: COLORS.textSecondary, padding: 12 }}>
+            Nenhum produto encontrado.
+          </Text>
+        }
+        renderItem={({ item }) => (
+          <View key={item.id} style={styles.productItem}>
+            <Image source={{ uri: item.image_url }} style={styles.productImage} />
+            <View style={styles.productInfo}>
+              <Text style={styles.productName}>{item.name}</Text>
+              <Text style={styles.productPrice}>R$ {item.price.toFixed(2)}</Text>
+              <Text style={styles.productStock}>{item.stock} em estoque</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => handleAddToCart(item)}
+            >
+              <Plus size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        )}
+      />
+            <View style={styles.cartSummary}>
+        <View style={styles.cartHeader}>
+          <View style={styles.cartIcon}>
+            <ShoppingCart size={20} color={COLORS.text} />
+          </View>
+          <Text style={styles.cartTitle}>Carrinho</Text>
+          <Text style={styles.cartItems}>
+            {totalItems} {totalItems === 1 ? 'item' : 'itens'}
+          </Text>
+        </View>
+
+        {Array.isArray(cartItems) && cartItems.length > 0 ? (
+
+          <View style={styles.cartContent}>
+            {cartItems.map((item) => (
+              <View key={item.id} style={styles.cartItem}>
+                <View style={styles.cartItemInfo}>
+                  <Text style={styles.cartItemName}>{item.name}</Text>
+                  <Text style={styles.cartItemPrice}>
+                    R$ {item.price.toFixed(2)}
+                  </Text>
+                </View>
+
+                <View style={styles.cartItemActions}>
+                  <TouchableOpacity
+                    style={styles.quantityButton}
+                    onPress={() => handleUpdateQuantity(item.id, -1)}
+                    disabled={item.quantity <= 1}
+                  >
+                    <Minus
+                      size={16}
+                      color={item.quantity <= 1 ? COLORS.textDisabled : COLORS.textSecondary}
+                    />
+                  </TouchableOpacity>
+
+                  <Text style={styles.quantityText}>{item.quantity}</Text>
+
+                  <TouchableOpacity
+                    style={styles.quantityButton}
+                    onPress={() => handleUpdateQuantity(item.id, 1)}
+                  >
+                    <Plus size={16} color={COLORS.textSecondary} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveFromCart(item.id)}
+                  >
+                    <Trash2 size={16} color={COLORS.error} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+
+            <View style={styles.subtotal}>
+              <Text style={styles.subtotalLabel}>Subtotal:</Text>
+              <Text style={styles.subtotalValue}>R$ {subtotal.toFixed(2)}</Text>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.emptyCart}>
+            <Text style={styles.emptyCartText}>Seu carrinho está vazio</Text>
+          </View>
+        )}
+      </View>
+
+      <TouchableOpacity
+        style={[styles.nextButton, cartItems.length === 0 && styles.disabledButton]}
+        onPress={() => handleNextStep()}
+        disabled={cartItems.length === 0}
+      >
+        <Text style={styles.nextButtonText}>Continuar</Text>
+      </TouchableOpacity>
+    </View>
+  );
+});
+
+
 export default function NewOrderScreen() {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -276,19 +410,20 @@ export default function NewOrderScreen() {
   );
 
   const filteredProducts = useMemo(() => {
+    if (!Array.isArray(products)) return [];
     const search = searchText.toLowerCase();
     return products.filter((product) => {
       const name = product.name?.toLowerCase() || '';
       const description = product.description?.toLowerCase() || '';
       const category = product.category?.toLowerCase() || '';
-  
       return (
         name.includes(search) ||
         description.includes(search) ||
         category.includes(search)
       );
     });
-  }, [products, searchText]);
+  }, [searchText, products]);
+  
   
   
 
@@ -500,125 +635,7 @@ export default function NewOrderScreen() {
     }
   };
 
-  const ProductSelection = () => (
-    <View style={styles.stepContainer}>
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar produtos..."
-          placeholderTextColor={COLORS.textSecondary}
-          value={searchText}
-          onChangeText={setSearchText}
-        />
-      </View>
 
-      <ScrollView style={styles.productList} keyboardShouldPersistTaps="handled">
-        {filteredProducts.map((product) => (
-          <View key={product.id} style={styles.productItem}>
-            <Image
-              source={{ uri: product.image_url }}
-              style={styles.productImage}
-            />
-            <View style={styles.productInfo}>
-              <Text style={styles.productName}>{product.name}</Text>
-              <Text style={styles.productPrice}>
-                R$ {product.price.toFixed(2)}
-              </Text>
-              <Text style={styles.productStock}>
-                {product.stock} em estoque
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => handleAddToCart(product)}
-            >
-              <Plus size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        ))}
-      </ScrollView>
-
-      <View style={styles.cartSummary}>
-        <View style={styles.cartHeader}>
-          <View style={styles.cartIcon}>
-            <ShoppingCart size={20} color={COLORS.text} />
-          </View>
-          <Text style={styles.cartTitle}>Carrinho</Text>
-          <Text style={styles.cartItems}>
-            {totalItems} {totalItems === 1 ? 'item' : 'itens'}
-          </Text>
-        </View>
-
-        {cartItems.length > 0 ? (
-          <View style={styles.cartContent}>
-            {cartItems.map((item) => (
-              <View key={item.id} style={styles.cartItem}>
-                <View style={styles.cartItemInfo}>
-                  <Text style={styles.cartItemName}>{item.name}</Text>
-                  <Text style={styles.cartItemPrice}>
-                    R$ {item.price.toFixed(2)}
-                  </Text>
-                </View>
-
-                <View style={styles.cartItemActions}>
-                  <TouchableOpacity
-                    style={styles.quantityButton}
-                    onPress={() => handleUpdateQuantity(item.id, -1)}
-                    disabled={item.quantity <= 1}
-                  >
-                    <Minus
-                      size={16}
-                      color={
-                        item.quantity <= 1
-                          ? COLORS.textDisabled
-                          : COLORS.textSecondary
-                      }
-                    />
-                  </TouchableOpacity>
-
-                  <Text style={styles.quantityText}>{item.quantity}</Text>
-
-                  <TouchableOpacity
-                    style={styles.quantityButton}
-                    onPress={() => handleUpdateQuantity(item.id, 1)}
-                  >
-                    <Plus size={16} color={COLORS.textSecondary} />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={() => handleRemoveFromCart(item.id)}
-                  >
-                    <Trash2 size={16} color={COLORS.error} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-
-            <View style={styles.subtotal}>
-              <Text style={styles.subtotalLabel}>Subtotal:</Text>
-              <Text style={styles.subtotalValue}>R$ {subtotal.toFixed(2)}</Text>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.emptyCart}>
-            <Text style={styles.emptyCartText}>Seu carrinho está vazio</Text>
-          </View>
-        )}
-      </View>
-
-      <TouchableOpacity
-        style={[
-          styles.nextButton,
-          cartItems.length === 0 && styles.disabledButton,
-        ]}
-        onPress={() => handleNextStep()}
-        disabled={cartItems.length === 0}
-      >
-        <Text style={styles.nextButtonText}>Continuar</Text>
-      </TouchableOpacity>
-    </View>
-  );
 
   return (
     <>
@@ -671,7 +688,21 @@ export default function NewOrderScreen() {
           </Text>
         </View>
 
-        {step === 1 && <ProductSelection />}
+        {step === 1 && (
+  <ProductSelection
+    filteredProducts={filteredProducts}
+    handleAddToCart={handleAddToCart}
+    cartItems={cartItems}
+    totalItems={totalItems}
+    subtotal={subtotal}
+    handleUpdateQuantity={handleUpdateQuantity}
+    handleRemoveFromCart={handleRemoveFromCart}
+    handleNextStep={handleNextStep}
+    searchText={searchText}
+    setSearchText={setSearchText}
+  />
+)}
+
         {step === 2 && (
           <CustomerInfoForm
             handlePreviousStep={handlePreviousStep}
