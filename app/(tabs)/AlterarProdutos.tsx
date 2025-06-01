@@ -26,6 +26,7 @@ export default function EditProductsScreen() {
       if (error) {
         console.error('Erro ao buscar produtos:', error.message);
       } else {
+        console.log('Produtos carregados:', data); // Log de depuração
         setProducts(data);
       }
 
@@ -35,16 +36,18 @@ export default function EditProductsScreen() {
     fetchProducts();
   }, []);
 
-  const handleUpdate = async (index: number) => {
-    const product = products[index]; // ← ESTA LINHA FALTAVA
-  
+  const handleUpdate = async (productId: string) => {
+    const index = products.findIndex((p) => p.id === productId);
+    if (index === -1) return;
+
+    const product = products[index];
     const { name, price, stock, description, category, image_url } = product;
-  
+
     const parsedPrice = parseFloat(String(price).replace(',', '.'));
     const parsedStock = parseInt(String(stock), 10);
-  
-    const supabase = createClient(); // ← também precisa garantir isso aqui
-  
+
+    const supabase = createClient();
+
     const { error } = await supabase
       .from('products')
       .update({
@@ -56,7 +59,7 @@ export default function EditProductsScreen() {
         image_url,
       })
       .eq('id', product.id);
-  
+
     if (error) {
       Alert.alert('Erro', 'Não foi possível atualizar o produto.');
     } else {
@@ -64,21 +67,25 @@ export default function EditProductsScreen() {
       setTimeout(() => setSuccessMessage(''), 3000);
     }
   };
-  
 
-  const handleChange = (index: number, field: string, value: string) => {
+  const handleChange = (productId: string, field: string, value: string) => {
+    const index = products.findIndex((p) => p.id === productId);
+    if (index === -1) return;
+
     const newProducts = [...products];
     newProducts[index] = {
       ...newProducts[index],
-      [field]: value, // mantém como string
+      [field]: value,
     };
     setProducts(newProducts);
   };
-  
 
   const filteredProducts = products.filter((product) =>
     product.name.toLowerCase().includes(searchText.toLowerCase())
   );
+
+  console.log('Texto de busca:', searchText); // Log de depuração
+  console.log('Produtos filtrados:', filteredProducts); // Log de depuração
 
   if (loading) {
     return (
@@ -103,61 +110,66 @@ export default function EditProductsScreen() {
         <Text style={styles.successText}>{successMessage}</Text>
       ) : null}
 
-      {filteredProducts.map((product, index) => (
-        <View key={product.id} style={styles.card}>
-          <Text style={styles.label}>Nome:</Text>
-          <TextInput
-            style={styles.input}
-            value={product.name}
-            onChangeText={(text) => handleChange(index, 'name', text)}
-          />
+      {filteredProducts.length === 0 ? (
+        <Text style={styles.noResultsText}>
+          Nenhum produto encontrado.
+        </Text>
+      ) : (
+        filteredProducts.map((product) => (
+          <View key={product.id} style={styles.card}>
+            <Text style={styles.label}>Nome:</Text>
+            <TextInput
+              style={styles.input}
+              value={product.name}
+              onChangeText={(text) => handleChange(product.id, 'name', text)}
+            />
 
-          <Text style={styles.label}>Preço:</Text>
-          <TextInput
-            style={styles.input}
-            value={String(product.price)}
-            keyboardType="default"
-            onChangeText={(text) => handleChange(index, 'price', text)}
-          />
+            <Text style={styles.label}>Preço:</Text>
+            <TextInput
+              style={styles.input}
+              value={String(product.price)}
+              keyboardType="default"
+              onChangeText={(text) => handleChange(product.id, 'price', text)}
+            />
 
+            <Text style={styles.label}>Estoque:</Text>
+            <TextInput
+              style={styles.input}
+              value={String(product.stock)}
+              keyboardType="numeric"
+              onChangeText={(text) => handleChange(product.id, 'stock', text)}
+            />
 
-          <Text style={styles.label}>Estoque:</Text>
-          <TextInput
-            style={styles.input}
-            value={String(product.stock)}
-            keyboardType="numeric"
-            onChangeText={(text) => handleChange(index, 'stock', text)}
-          />
+            <Text style={styles.label}>Descrição:</Text>
+            <TextInput
+              style={styles.input}
+              value={product.description || ''}
+              onChangeText={(text) => handleChange(product.id, 'description', text)}
+            />
 
-          <Text style={styles.label}>Descrição:</Text>
-          <TextInput
-            style={styles.input}
-            value={product.description || ''}
-            onChangeText={(text) => handleChange(index, 'description', text)}
-          />
+            <Text style={styles.label}>Categoria:</Text>
+            <TextInput
+              style={styles.input}
+              value={product.category || ''}
+              onChangeText={(text) => handleChange(product.id, 'category', text)}
+            />
 
-          <Text style={styles.label}>Categoria:</Text>
-          <TextInput
-            style={styles.input}
-            value={product.category || ''}
-            onChangeText={(text) => handleChange(index, 'category', text)}
-          />
+            <Text style={styles.label}>Imagem (URL):</Text>
+            <TextInput
+              style={styles.input}
+              value={product.image_url || ''}
+              onChangeText={(text) => handleChange(product.id, 'image_url', text)}
+            />
 
-          <Text style={styles.label}>Imagem (URL):</Text>
-          <TextInput
-            style={styles.input}
-            value={product.image_url || ''}
-            onChangeText={(text) => handleChange(index, 'image_url', text)}
-          />
-
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => handleUpdate(index)}
-          >
-            <Text style={styles.buttonText}>Salvar Alterações</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => handleUpdate(product.id)}
+            >
+              <Text style={styles.buttonText}>Salvar Alterações</Text>
+            </TouchableOpacity>
+          </View>
+        ))
+      )}
     </ScrollView>
   );
 }
@@ -189,6 +201,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
+  },
+  noResultsText: {
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: 20,
+    fontStyle: 'italic',
   },
   card: {
     backgroundColor: COLORS.card,
