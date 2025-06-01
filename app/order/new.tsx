@@ -112,7 +112,7 @@ const CustomerInfoForm = ({ handlePreviousStep, handleNextStep }) => {
             <Text style={styles.textareaLabel}>Observações:</Text>
             <TextInput
               style={styles.textarea}
-              placeholder="Instruções para entrega, dados para nota fiscal nome e cpf e forma de pagammento."
+              placeholder="Instruções para entrega, dados para nota fiscal nome e cpf e forma de pagamento."
               placeholderTextColor={COLORS.textSecondary}
               multiline
               numberOfLines={4}
