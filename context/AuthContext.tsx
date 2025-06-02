@@ -1,4 +1,10 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useState,
+  useContext,
+  useEffect,
+  ReactNode,
+} from 'react';
 import { createClient } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
@@ -12,6 +18,7 @@ interface User {
   cpf: string;
   address: string;
   pixKey: string;
+  admin: boolean;
 }
 
 interface AuthState {
@@ -72,10 +79,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const loadSession = async () => {
       try {
         const sessionStr = await storage.getItem('session');
-        if (sessionStr) {
+        const userStr = await storage.getItem('user');
+
+        if (sessionStr && userStr) {
           const session = JSON.parse(sessionStr);
-          const userStr = await storage.getItem('user');
-          const user = userStr ? JSON.parse(userStr) : null;
+          const user = JSON.parse(userStr);
+
+          console.log('Usuário restaurado:', user); // ← log de depuração
 
           setState({
             session,
@@ -86,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setState((prev) => ({ ...prev, isLoading: false }));
         }
       } catch (error) {
-        console.error('Error loading session:', error);
+        console.error('Erro ao carregar sessão:', error);
         setState((prev) => ({ ...prev, isLoading: false }));
       }
     };
@@ -111,9 +121,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('id', userId)
         .maybeSingle();
 
-      if (userError || !userData) throw new Error('Perfil do usuário não encontrado.');
+      if (userError || !userData)
+        throw new Error('Perfil do usuário não encontrado.');
 
-      const user = {
+      const user: User = {
         id: userData.id,
         email: userData.email,
         fullName: userData.full_name,
@@ -121,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         cpf: userData.cpf,
         address: userData.address,
         pixKey: userData.pix_key,
+        admin: userData.admin ?? false,
       };
 
       await storage.setItem('session', JSON.stringify(data.session));
@@ -135,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       router.replace('/(tabs)/');
     } catch (error) {
-      console.error('Error signing in:', error);
+      console.error('Erro no login:', error);
       throw error;
     }
   };
@@ -157,24 +169,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error || !data.user) throw error;
 
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: data.user.id,
-          email: userData.email,
-          full_name: userData.fullName,
-          phone: userData.phone,
-          cpf: userData.cpf,
-          address: userData.address,
-          pix_key: userData.pixKey,
-          created_at: new Date(),
-        });
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: data.user.id,
+        email: userData.email,
+        full_name: userData.fullName,
+        phone: userData.phone,
+        cpf: userData.cpf,
+        address: userData.address,
+        pix_key: userData.pixKey,
+        admin: false,
+        created_at: new Date(),
+      });
 
       if (profileError) throw profileError;
 
       await signIn(userData.email, userData.password);
     } catch (error) {
-      console.error('Error signing up:', error);
+      console.error('Erro no cadastro:', error);
       throw error;
     }
   };
@@ -198,7 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       router.replace('/(auth)/login');
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('Erro ao sair:', error);
       throw error;
     }
   };
@@ -219,8 +230,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+  if (!context) {
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
   }
   return context;
 };

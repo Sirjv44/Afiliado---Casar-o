@@ -5,7 +5,14 @@ import { COLORS } from '@/constants/Colors';
 import StatusCard from '@/components/StatusCard';
 import ActionButton from '@/components/ActionButton';
 import { useAuth } from '@/context/AuthContext';
-import { ShoppingBag, Database, CreditCard, LogOut } from 'lucide-react-native';
+import {
+  ShoppingBag,
+  Database,
+  CreditCard,
+  LogOut,
+  Users,
+  Settings,
+} from 'lucide-react-native';
 import { createClient } from '@/lib/supabase';
 
 export default function DashboardScreen() {
@@ -19,8 +26,6 @@ export default function DashboardScreen() {
     pendingCommission: 0,
     totalCommission: 0,
   });
-
-
 
   const handleLogout = async () => {
     try {
@@ -41,7 +46,6 @@ export default function DashboardScreen() {
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
 
-        // Dados do usuário logado
         const { data: orders } = await supabase
           .from('orders')
           .select('total_amount, created_at')
@@ -72,7 +76,6 @@ export default function DashboardScreen() {
           totalCommission,
         });
 
-        // Últimas vendas de outros afiliados (via order_items)
         const { data: sales } = await supabase
           .from('order_items')
           .select(
@@ -163,6 +166,25 @@ export default function DashboardScreen() {
             icon={<LogOut size={20} color={COLORS.primary} />}
           />
         </View>
+
+        {/* ✅ Seção visível apenas para administradores */}
+        {user?.admin && (
+          <>
+            <Text style={styles.sectionTitle}>Administração</Text>
+            <View style={styles.actionsContainer}>
+              <ActionButton
+                title="Lista de Afiliados"
+                onPress={() => router.push('/admin/Afiliados')}
+                icon={<Users size={20} color="#FFFFFF" />}
+              />
+              <ActionButton
+                title="Alterar Produtos"
+                onPress={() => router.push('/admin/AlterarProdutos')}
+                icon={<Settings size={20} color="#FFFFFF" />}
+              />
+            </View>
+          </>
+        )}
 
         <View style={styles.promotionContainer}>
           <Text style={styles.promotionTitle}>Promoção da Semana!</Text>

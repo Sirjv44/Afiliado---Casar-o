@@ -584,17 +584,25 @@ export default function NewOrderScreen() {
         }
       }
 
-      const commissionsToInsert = cartItems.map((item) => {
-        const commissionRate = item.category === 'Emagrecimento' ? 0.4 : 0.15;
-        const amount = item.price * item.quantity * commissionRate;
+      const highCommissionKeywords = ['tribulus', 'maca peruana', 'provitalis', 'cindura', 'ioimbina'];
 
-        return {
-          order_id: orderId,
-          affiliate_id: userId,
-          amount,
-          status: 'pending',
-        };
-      });
+const commissionsToInsert = cartItems.map((item) => {
+  const name = item.name.toLowerCase();
+  const isHighCommission = highCommissionKeywords.some((keyword) =>
+    name.startsWith(keyword) || name.includes(keyword)
+  );
+
+  const commissionRate = isHighCommission ? 0.4 : 0.15;
+  const amount = item.price * item.quantity * commissionRate;
+
+  return {
+    order_id: orderId,
+    affiliate_id: userId,
+    amount,
+    status: 'pending',
+  };
+});
+
 
       const { error: commissionError } = await supabase
         .from('commissions')

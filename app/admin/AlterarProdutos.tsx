@@ -11,6 +11,11 @@ import {
 } from 'react-native';
 import { COLORS } from '@/constants/Colors';
 import { createClient } from '@/lib/supabase';
+import { useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+
+
+
 
 export default function EditProductsScreen() {
   const [products, setProducts] = useState([]);
@@ -68,6 +73,37 @@ export default function EditProductsScreen() {
     }
   };
 
+  const handleDelete = async (productId: string) => {
+    Alert.alert(
+      'Confirmar exclusão',
+      'Tem certeza que deseja excluir este produto?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            const supabase = createClient();
+            const { error } = await supabase.from('products').delete().eq('id', productId);
+  
+            if (error) {
+              Alert.alert('Erro', 'Não foi possível excluir o produto.');
+            } else {
+              const updatedList = products.filter((p) => p.id !== productId);
+              setProducts(updatedList);
+              setSuccessMessage('Produto excluído com sucesso!');
+              setTimeout(() => setSuccessMessage(''), 3000);
+            }
+          },
+        },
+      ]
+    );
+  };
+  
+
   const handleChange = (productId: string, field: string, value: string) => {
     const index = products.findIndex((p) => p.id === productId);
     if (index === -1) return;
@@ -79,6 +115,18 @@ export default function EditProductsScreen() {
     };
     setProducts(newProducts);
   };
+
+  const router = useRouter();
+  const { success } = useLocalSearchParams();
+
+useEffect(() => {
+  if (success === '1') {
+    setSuccessMessage('Produto adicionado com sucesso!');
+    setTimeout(() => setSuccessMessage(''), 3000);
+  }
+}, [success]);
+
+
 
   const filteredProducts = products.filter((product) =>
     product.name.toLowerCase().includes(searchText.toLowerCase())
@@ -105,6 +153,14 @@ export default function EditProductsScreen() {
         value={searchText}
         onChangeText={setSearchText}
       />
+
+      <TouchableOpacity
+        style={[styles.button, { marginBottom: 16 }]}
+        onPress={() => router.push('/CriarProduto')}
+      >
+        <Text style={styles.buttonText}>Incluir Produto</Text>
+      </TouchableOpacity>
+
 
       {successMessage ? (
         <Text style={styles.successText}>{successMessage}</Text>
@@ -167,6 +223,13 @@ export default function EditProductsScreen() {
             >
               <Text style={styles.buttonText}>Salvar Alterações</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: 'red', marginTop: 8 }]}
+              onPress={() => handleDelete(product.id)}
+            >
+              <Text style={styles.buttonText}>Excluir Produto</Text>
+            </TouchableOpacity>
+
           </View>
         ))
       )}

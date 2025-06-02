@@ -1,19 +1,19 @@
-import React, { useEffect } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
-import { Tabs, router } from 'expo-router';
+import React from 'react';
+import { Tabs } from 'expo-router';
 import { COLORS } from '@/constants/Colors';
 import {
-  Chrome as Home,
+  Home,
   Database,
   ShoppingBag,
   CreditCard,
   GraduationCap,
-  Users,
 } from 'lucide-react-native';
 import { useAuth } from '@/context/AuthContext';
 
 export default function TabLayout() {
   const { user } = useAuth();
+
+  console.log('Usuário no TabLayout:', user); // Log para depuração
 
   return (
     <Tabs
@@ -40,6 +40,7 @@ export default function TabLayout() {
         },
       }}
     >
+      {/* Abas disponíveis para todos os usuários */}
       <Tabs.Screen
         name="index"
         options={{
@@ -88,18 +89,8 @@ export default function TabLayout() {
           headerTitle: 'Área de Treinamento',
         }}
       />
-      {user?.admin && (
-        <Tabs.Screen
-          name="affiliates"
-          options={{
-            title: 'Afiliados',
-            tabBarIcon: ({ color, size }) => (
-              <Users size={size} color={color} />
-            ),
-            headerTitle: 'Lista de Afiliados',
-          }}
-        />
-      )}
+
+      {/* NÃO adicionar affiliates e AlterarProdutos aqui. Devem estar em /admin e acessadas via push */}
     </Tabs>
   );
 }
