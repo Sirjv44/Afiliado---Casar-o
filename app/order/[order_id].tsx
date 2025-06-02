@@ -6,6 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Image,
+  TextInput,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { COLORS } from '@/constants/Colors';
@@ -16,12 +17,12 @@ export default function OrderDetailScreen() {
   const [products, setProducts] = useState([]);
   const [orderInfo, setOrderInfo] = useState({ client_address: '', notes: '' });
   const [loading, setLoading] = useState(true);
+  const [searchText, setSearchText] = useState('');
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
       const supabase = createClient();
 
-      // Buscar os itens do pedido
       const { data: itemsData, error: itemsError } = await supabase
         .from('order_items')
         .select('quantity, price, products (name, image_url, description)')
@@ -33,7 +34,6 @@ export default function OrderDetailScreen() {
         setProducts(itemsData);
       }
 
-      // Buscar o endereço e observações do pedido
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select('client_address, notes')
@@ -53,6 +53,13 @@ export default function OrderDetailScreen() {
       fetchOrderDetails();
     }
   }, [order_id]);
+
+  const filteredProducts = products.filter((item) => {
+    const name = item.products.name?.toLowerCase() || '';
+    const description = item.products.description?.toLowerCase() || '';
+    const search = searchText.toLowerCase();
+    return name.includes(search) || description.includes(search);
+  });
 
   if (loading) {
     return (
@@ -75,20 +82,32 @@ export default function OrderDetailScreen() {
         <Text style={styles.infoText}>{orderInfo.notes || 'Nenhuma observação'}</Text>
       </View>
 
-      {products.map((item, index) => (
-        <View key={index} style={styles.card}>
-          <Image
-            source={{ uri: item.products.image_url }}
-            style={styles.image}
-          />
-          <View style={styles.details}>
-            <Text style={styles.name}>{item.products.name}</Text>
-            <Text style={styles.description}>{item.products.description}</Text>
-            <Text style={styles.text}>Quantidade: {item.quantity}</Text>
-            <Text style={styles.text}>Preço: R$ {item.price.toFixed(2)}</Text>
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Buscar produto..."
+        placeholderTextColor={COLORS.textSecondary}
+        value={searchText}
+        onChangeText={setSearchText}
+      />
+
+      {filteredProducts.length === 0 ? (
+        <Text style={styles.emptyText}>Nenhum produto encontrado.</Text>
+      ) : (
+        filteredProducts.map((item, index) => (
+          <View key={index} style={styles.card}>
+            <Image
+              source={{ uri: item.products.image_url }}
+              style={styles.image}
+            />
+            <View style={styles.details}>
+              <Text style={styles.name}>{item.products.name}</Text>
+              <Text style={styles.description}>{item.products.description}</Text>
+              <Text style={styles.text}>Quantidade: {item.quantity}</Text>
+              <Text style={styles.text}>Preço: R$ {item.price.toFixed(2)}</Text>
+            </View>
           </View>
-        </View>
-      ))}
+        ))
+      )}
     </ScrollView>
   );
 }
@@ -119,6 +138,19 @@ const styles = StyleSheet.create({
   infoText: {
     marginBottom: 12,
     color: COLORS.textSecondary,
+  },
+  searchInput: {
+    backgroundColor: COLORS.card,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 20,
+    color: COLORS.text,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 12,
   },
   card: {
     flexDirection: 'row',
