@@ -46,7 +46,7 @@ export default function AffiliatesScreen() {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, email')
+        .select('id, full_name, email, phone, address')
         .eq('admin', false)
         .neq('id', user?.id);
 
@@ -103,6 +103,8 @@ export default function AffiliatesScreen() {
           >
             <Text style={styles.name}>{affiliate.full_name}</Text>
             <Text style={styles.email}>{affiliate.email}</Text>
+            <Text style={styles.phone}>📞 {affiliate.phone || 'Sem telefone'}</Text>
+            <Text style={styles.address}>📍 {affiliate.address || 'Sem endereço informado'}</Text>
           </TouchableOpacity>
         ))
       )}
@@ -132,6 +134,16 @@ const styles = StyleSheet.create({
   email: {
     fontSize: 14,
     color: COLORS.textSecondary,
+  },
+  phone: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+  },
+  address: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginTop: 2,
   },
   errorText: {
     padding: 16,
