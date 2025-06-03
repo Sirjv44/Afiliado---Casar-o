@@ -11,57 +11,56 @@ import {
 } from 'react-native';
 import { COLORS } from '@/constants/Colors';
 import { createClient } from '@/lib/supabase';
-import { useRouter } from 'expo-router';
-import { useLocalSearchParams } from 'expo-router';
-
-
-
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 export default function EditProductsScreen() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const router = useRouter();
+  const { success } = useLocalSearchParams();
+
+  const fetchProducts = async () => {
+    const supabase = createClient();
+    const { data, error } = await supabase.from('products').select('*');
+    if (error) {
+      console.error('Erro ao buscar produtos:', error.message);
+    } else {
+      setProducts(data);
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase.from('products').select('*');
-
-      if (error) {
-        console.error('Erro ao buscar produtos:', error.message);
-      } else {
-        console.log('Produtos carregados:', data); // Log de depuração
-        setProducts(data);
-      }
-
-      setLoading(false);
-    };
-
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    if (success === '1') {
+      setSuccessMessage('Produto adicionado com sucesso!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    }
+  }, [success]);
 
   const handleUpdate = async (productId: string) => {
     const index = products.findIndex((p) => p.id === productId);
     if (index === -1) return;
-
     const product = products[index];
-    const { name, price, stock, description, category, image_url } = product;
 
-    const parsedPrice = parseFloat(String(price).replace(',', '.'));
-    const parsedStock = parseInt(String(stock), 10);
+    const parsedPrice = parseFloat(String(product.price).replace(',', '.'));
+    const parsedStock = parseInt(String(product.stock), 10);
 
     const supabase = createClient();
-
     const { error } = await supabase
       .from('products')
       .update({
-        name,
+        name: product.name,
         price: parsedPrice,
         stock: parsedStock,
-        description,
-        category,
-        image_url,
+        description: product.description,
+        category: product.category,
+        image_url: product.image_url,
       })
       .eq('id', product.id);
 
@@ -74,66 +73,28 @@ export default function EditProductsScreen() {
   };
 
   const handleDelete = async (productId: string) => {
-    Alert.alert(
-      'Confirmar exclusão',
-      'Tem certeza que deseja excluir este produto?',
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            const supabase = createClient();
-            const { error } = await supabase.from('products').delete().eq('id', productId);
-  
-            if (error) {
-              Alert.alert('Erro', 'Não foi possível excluir o produto.');
-            } else {
-              const updatedList = products.filter((p) => p.id !== productId);
-              setProducts(updatedList);
-              setSuccessMessage('Produto excluído com sucesso!');
-              setTimeout(() => setSuccessMessage(''), 3000);
-            }
-          },
-        },
-      ]
-    );
+    const supabase = createClient();
+    const { error } = await supabase.from('products').delete().eq('id', productId);
+
+    if (error) {
+      console.error('Erro ao excluir produto:', error.message);
+      Alert.alert('Erro', 'Não foi possível excluir o produto.');
+    } else {
+      setSuccessMessage('Produto excluído com sucesso!');
+      setProducts((prev) => prev.filter((p) => p.id !== productId));
+      setTimeout(() => setSuccessMessage(''), 3000);
+    }
   };
-  
 
   const handleChange = (productId: string, field: string, value: string) => {
-    const index = products.findIndex((p) => p.id === productId);
-    if (index === -1) return;
-
-    const newProducts = [...products];
-    newProducts[index] = {
-      ...newProducts[index],
-      [field]: value,
-    };
-    setProducts(newProducts);
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, [field]: value } : p))
+    );
   };
-
-  const router = useRouter();
-  const { success } = useLocalSearchParams();
-
-useEffect(() => {
-  if (success === '1') {
-    setSuccessMessage('Produto adicionado com sucesso!');
-    setTimeout(() => setSuccessMessage(''), 3000);
-  }
-}, [success]);
-
-
 
   const filteredProducts = products.filter((product) =>
     product.name.toLowerCase().includes(searchText.toLowerCase())
   );
-
-  console.log('Texto de busca:', searchText); // Log de depuração
-  console.log('Produtos filtrados:', filteredProducts); // Log de depuração
 
   if (loading) {
     return (
@@ -161,15 +122,10 @@ useEffect(() => {
         <Text style={styles.buttonText}>Incluir Produto</Text>
       </TouchableOpacity>
 
-
-      {successMessage ? (
-        <Text style={styles.successText}>{successMessage}</Text>
-      ) : null}
+      {successMessage && <Text style={styles.successText}>{successMessage}</Text>}
 
       {filteredProducts.length === 0 ? (
-        <Text style={styles.noResultsText}>
-          Nenhum produto encontrado.
-        </Text>
+        <Text style={styles.noResultsText}>Nenhum produto encontrado.</Text>
       ) : (
         filteredProducts.map((product) => (
           <View key={product.id} style={styles.card}>
@@ -200,7 +156,9 @@ useEffect(() => {
             <TextInput
               style={styles.input}
               value={product.description || ''}
-              onChangeText={(text) => handleChange(product.id, 'description', text)}
+              onChangeText={(text) =>
+                handleChange(product.id, 'description', text)
+              }
             />
 
             <Text style={styles.label}>Categoria:</Text>
@@ -214,7 +172,9 @@ useEffect(() => {
             <TextInput
               style={styles.input}
               value={product.image_url || ''}
-              onChangeText={(text) => handleChange(product.id, 'image_url', text)}
+              onChangeText={(text) =>
+                handleChange(product.id, 'image_url', text)
+              }
             />
 
             <TouchableOpacity
@@ -229,7 +189,6 @@ useEffect(() => {
             >
               <Text style={styles.buttonText}>Excluir Produto</Text>
             </TouchableOpacity>
-
           </View>
         ))
       )}

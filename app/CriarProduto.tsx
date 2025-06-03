@@ -1,4 +1,3 @@
-// app/create-product.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -32,9 +31,28 @@ export default function CreateProductScreen() {
   const handleSave = async () => {
     const supabase = createClient();
 
+    // Verificar se produto com mesmo nome já existe
+    const { data: existingProduct, error: checkError } = await supabase
+      .from('products')
+      .select('id')
+      .ilike('name', form.name.trim()) // checagem case-insensitive
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Erro ao verificar duplicação:', checkError.message);
+      Alert.alert('Erro', 'Erro ao verificar duplicação.');
+      return;
+    }
+
+    if (existingProduct) {
+      Alert.alert('Produto já cadastrado', 'Já existe um produto com esse nome.');
+      return;
+    }
+
+    // Inserir novo produto
     const { error } = await supabase.from('products').insert([
       {
-        name: form.name,
+        name: form.name.trim(),
         price: parseFloat(form.price.replace(',', '.')),
         stock: parseInt(form.stock),
         description: form.description,
