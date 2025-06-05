@@ -18,7 +18,8 @@ import { Mail, User, Phone, Key, Hash, MapPin } from 'lucide-react-native';
 export default function RegisterScreen() {
   const { signUp } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  
+  const [highlightedFields, setHighlightedFields] = useState<string[]>([]);
+
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -38,26 +39,30 @@ export default function RegisterScreen() {
   };
 
   const validateForm = () => {
-    if (!formData.fullName || !formData.email || !formData.phone || 
-        !formData.cpf || !formData.address || !formData.pixKey || 
-        !formData.password || !formData.confirmPassword) {
+    const emptyFields = Object.entries(formData).filter(([_, value]) => !value).map(([key]) => key);
+    setHighlightedFields(emptyFields);
+
+    if (emptyFields.length > 0) {
       Alert.alert('Erro', 'Todos os campos são obrigatórios.');
       return false;
     }
 
     if (formData.password !== formData.confirmPassword) {
       Alert.alert('Erro', 'As senhas não conferem.');
+      setHighlightedFields((prev) => [...new Set([...prev, 'password', 'confirmPassword'])]);
       return false;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       Alert.alert('Erro', 'Email inválido.');
+      setHighlightedFields((prev) => [...new Set([...prev, 'email'])]);
       return false;
     }
 
     if (formData.password.length < 6) {
       Alert.alert('Erro', 'A senha deve ter pelo menos 6 caracteres.');
+      setHighlightedFields((prev) => [...new Set([...prev, 'password'])]);
       return false;
     }
 
@@ -78,7 +83,7 @@ export default function RegisterScreen() {
         address: formData.address,
         pixKey: formData.pixKey,
       });
-      
+
       Alert.alert('Sucesso', 'Cadastro realizado com sucesso!');
       router.replace('/(tabs)/');
     } catch (error) {
@@ -88,6 +93,11 @@ export default function RegisterScreen() {
       setIsLoading(false);
     }
   };
+
+  const getInputStyle = (field: string) => [
+    styles.inputContainer,
+    highlightedFields.includes(field) && { borderColor: 'red', borderWidth: 1 },
+  ];
 
   return (
     <ScrollView contentContainerStyle={styles.scrollView}>
@@ -102,9 +112,9 @@ export default function RegisterScreen() {
             <Text style={styles.subtitle}>Venda suplementos e ganhe comissões</Text>
           </View>
         </View>
-        
+
         <View style={styles.formContainer}>
-          <View style={styles.inputContainer}>
+          <View style={getInputStyle('fullName')}>
             <User size={20} color={COLORS.textSecondary} />
             <TextInput
               style={styles.input}
@@ -115,7 +125,7 @@ export default function RegisterScreen() {
             />
           </View>
 
-          <View style={styles.inputContainer}>
+          <View style={getInputStyle('email')}>
             <Mail size={20} color={COLORS.textSecondary} />
             <TextInput
               style={styles.input}
@@ -128,7 +138,7 @@ export default function RegisterScreen() {
             />
           </View>
 
-          <View style={styles.inputContainer}>
+          <View style={getInputStyle('phone')}>
             <Phone size={20} color={COLORS.textSecondary} />
             <TextInput
               style={styles.input}
@@ -140,7 +150,7 @@ export default function RegisterScreen() {
             />
           </View>
 
-          <View style={styles.inputContainer}>
+          <View style={getInputStyle('cpf')}>
             <Hash size={20} color={COLORS.textSecondary} />
             <TextInput
               style={styles.input}
@@ -152,7 +162,7 @@ export default function RegisterScreen() {
             />
           </View>
 
-          <View style={styles.inputContainer}>
+          <View style={getInputStyle('address')}>
             <MapPin size={20} color={COLORS.textSecondary} />
             <TextInput
               style={styles.input}
@@ -163,7 +173,7 @@ export default function RegisterScreen() {
             />
           </View>
 
-          <View style={styles.inputContainer}>
+          <View style={getInputStyle('pixKey')}>
             <Key size={20} color={COLORS.textSecondary} />
             <TextInput
               style={styles.input}
@@ -174,7 +184,7 @@ export default function RegisterScreen() {
             />
           </View>
 
-          <View style={styles.inputContainer}>
+          <View style={getInputStyle('password')}>
             <Key size={20} color={COLORS.textSecondary} />
             <TextInput
               style={styles.input}
@@ -186,7 +196,7 @@ export default function RegisterScreen() {
             />
           </View>
 
-          <View style={styles.inputContainer}>
+          <View style={getInputStyle('confirmPassword')}>
             <Key size={20} color={COLORS.textSecondary} />
             <TextInput
               style={styles.input}

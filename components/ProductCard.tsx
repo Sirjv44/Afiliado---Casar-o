@@ -1,7 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ToastAndroid, Platform } from 'react-native';
 import { COLORS } from '@/constants/Colors';
-import { ShoppingCart, Bookmark } from 'lucide-react-native';
+import { ShoppingCart, Bookmark, BookmarkCheck } from 'lucide-react-native';
+import { createClient } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 export interface Product {
   id: string;
@@ -10,7 +12,7 @@ export interface Product {
   stock: number;
   description: string;
   category: string;
-  image_Url: string;
+  image_url: string;
 }
 
 interface ProductCardProps {
@@ -20,42 +22,102 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product, onAddToCart, onViewDetails }: ProductCardProps) {
+  const { user } = useAuth();
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isLoadingFavorite, setIsLoadingFavorite] = useState(false);
+
+  useEffect(() => {
+    const checkFavorite = async () => {
+      if (!user?.id) return;
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('id')
+        .eq('affiliated_id', user.id)
+        .eq('product_id', product.id)
+        .maybeSingle();
+
+      if (!error && data) {
+        setIsFavorite(true);
+      } else {
+        setIsFavorite(false);
+      }
+    };
+
+    checkFavorite();
+  }, [product.id, user?.id]);
+
+  const showToast = (message: string) => {
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(message, ToastAndroid.SHORT);
+    } else {
+      alert(message);
+    }
+  };
+
+  const toggleFavorite = async () => {
+    if (!user?.id || isLoadingFavorite) return;
+    setIsLoadingFavorite(true);
+    const supabase = createClient();
+
+    if (!isFavorite) {
+      const { error } = await supabase.from('favorites').insert({
+        affiliated_id: user.id,
+        product_id: product.id,
+      });
+
+      if (!error) {
+        setIsFavorite(true);
+        showToast('Adicionado aos favoritos');
+      } else {
+        console.error('Erro ao favoritar:', error.message);
+      }
+    } else {
+      const { error } = await supabase
+        .from('favorites')
+        .delete()
+        .match({ affiliated_id: user.id, product_id: product.id });
+
+      if (!error) {
+        setIsFavorite(false);
+        showToast('Removido dos favoritos');
+      } else {
+        console.error('Erro ao desfavoritar:', error.message);
+      }
+    }
+    setIsLoadingFavorite(false);
+  };
+
   return (
-    <TouchableOpacity 
-      style={styles.card}
-      onPress={() => onViewDetails(product)}
-      activeOpacity={0.9}
-    >
+    <TouchableOpacity style={styles.card} onPress={() => onViewDetails(product)} activeOpacity={0.9}>
       <Image source={{ uri: product.image_url }} style={styles.image} />
 
-      
       <View style={styles.categoryBadge}>
         <Text style={styles.categoryText}>{product.category}</Text>
       </View>
-      
+
       <View style={styles.contentContainer}>
         <Text style={styles.name}>{product.name}</Text>
-        
+
         <View style={styles.priceRow}>
           <Text style={styles.price}>R$ {product.price.toFixed(2)}</Text>
           <Text style={styles.stock}>{product.stock} em estoque</Text>
         </View>
-        
-        <Text style={styles.description} numberOfLines={2}>
-          {product.description}
-        </Text>
-        
+
+        <Text style={styles.description} numberOfLines={2}>{product.description}</Text>
+
         <View style={styles.actions}>
-          <TouchableOpacity 
-            style={styles.addButton}
-            onPress={() => onAddToCart(product)}
-          >
+          <TouchableOpacity style={styles.addButton} onPress={() => onAddToCart(product)}>
             <ShoppingCart size={16} color="#FFFFFF" />
             <Text style={styles.buttonText}>Adicionar</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.saveButton}>
-            <Bookmark size={18} color={COLORS.primary} />
+
+          <TouchableOpacity style={styles.saveButton} onPress={toggleFavorite} disabled={isLoadingFavorite}>
+            {isFavorite ? (
+              <BookmarkCheck size={18} color={COLORS.primary} />
+            ) : (
+              <Bookmark size={18} color={COLORS.primary} />
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -77,10 +139,9 @@ const styles = StyleSheet.create({
   },
   image: {
     width: '100%',
-    aspectRatio: 1.2, // Ajuste este valor conforme necessário (1.5, 1.3 etc.)
+    aspectRatio: 1.2,
     resizeMode: 'cover',
   },
-  
   categoryBadge: {
     position: 'absolute',
     top: 12,

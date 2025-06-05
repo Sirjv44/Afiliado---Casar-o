@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Image,
+  TouchableOpacity,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/Colors';
 import StatusCard from '@/components/StatusCard';
@@ -12,6 +19,7 @@ import {
   LogOut,
   Users,
   Settings,
+  Bookmark,
 } from 'lucide-react-native';
 import { createClient } from '@/lib/supabase';
 
@@ -154,6 +162,11 @@ export default function DashboardScreen() {
             icon={<Database size={20} color="#FFFFFF" />}
           />
           <ActionButton
+            title="Favoritos"
+            onPress={() => router.push('/Favoritos')}
+            icon={<Bookmark size={20} color="#FFFFFF" />}
+          />
+          <ActionButton
             title="Minhas Comissões"
             onPress={() => router.push('/(tabs)/commissions')}
             icon={<CreditCard size={20} color="#FFFFFF" />}
@@ -167,7 +180,6 @@ export default function DashboardScreen() {
           />
         </View>
 
-        {/* ✅ Seção visível apenas para administradores */}
         {user?.admin && (
           <>
             <Text style={styles.sectionTitle}>Administração</Text>
