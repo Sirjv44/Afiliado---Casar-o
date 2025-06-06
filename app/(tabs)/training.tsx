@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -6,52 +6,104 @@ import {
   TouchableOpacity,
   FlatList,
   Image,
-  ActivityIndicator,
 } from 'react-native';
 import { Video, ChevronRight } from 'lucide-react-native';
 import { COLORS } from '@/constants/Colors';
 import { useRouter } from 'expo-router';
-import { createClient } from '@/lib/supabase';
 
-interface TrainingItem {
-  id: string;
-  title: string;
-  content: string;
-  thumbnail: string;
-  duration: string;
-  category: string;
-}
+const staticVideos = [
+  {
+    id: '1',
+    title: 'Barras de Proteínas',
+    content: 'https://youtube.com/shorts/JVNvjO-oMbw?feature=share',
+    thumbnail: 'https://img.youtube.com/vi/JVNvjO-oMbw/0.jpg',
+    duration: '00:30',
+    category: 'Suplementos',
+  },
+  {
+    id: '2',
+    title: 'Colágeno',
+    content: 'https://youtube.com/shorts/8sZ3Hhec8ZI?feature=share',
+    thumbnail: 'https://img.youtube.com/vi/8sZ3Hhec8ZI/0.jpg',
+    duration: '00:30',
+    category: 'Beleza e Saúde',
+  },
+  {
+    id: '3',
+    title: 'Aumento de Testosterona',
+    content: 'https://youtube.com/shorts/uf6gomb0crE?feature=share',
+    thumbnail: 'https://img.youtube.com/vi/uf6gomb0crE/0.jpg',
+    duration: '00:30',
+    category: 'Hormonal',
+  },
+  {
+    id: '4',
+    title: 'Repositores',
+    content: 'https://youtube.com/shorts/gC392HXOdsI?feature=share',
+    thumbnail: 'https://img.youtube.com/vi/gC392HXOdsI/0.jpg',
+    duration: '00:30',
+    category: 'Nutrição',
+  },
+  {
+    id: '5',
+    title: 'Termogênicos',
+    content: 'https://youtube.com/shorts/02VLu7mdb-Y?feature=share',
+    thumbnail: 'https://img.youtube.com/vi/02VLu7mdb-Y/0.jpg',
+    duration: '00:30',
+    category: 'Emagrecimento',
+  },
+  {
+    id: '6',
+    title: 'Hipercalóricos',
+    content: 'https://youtube.com/shorts/0OFY4I6rmYo?feature=share',
+    thumbnail: 'https://img.youtube.com/vi/0OFY4I6rmYo/0.jpg',
+    duration: '00:30',
+    category: 'Ganho de Massa',
+  },
+  {
+    id: '7',
+    title: 'Ômega 3',
+    content: 'https://youtube.com/shorts/TfKHTWj6_Zs?feature=share',
+    thumbnail: 'https://img.youtube.com/vi/TfKHTWj6_Zs/0.jpg',
+    duration: '00:30',
+    category: 'Saúde',
+  },
+  {
+    id: '8',
+    title: 'Glutamina',
+    content: 'https://youtube.com/shorts/Amo0RbtNFxU?feature=share',
+    thumbnail: 'https://img.youtube.com/vi/Amo0RbtNFxU/0.jpg',
+    duration: '00:30',
+    category: 'Imunidade',
+  },
+  {
+    id: '9',
+    title: 'Creatina',
+    content: 'https://youtube.com/shorts/xgaxTSwz8JU?feature=share',
+    thumbnail: 'https://img.youtube.com/vi/xgaxTSwz8JU/0.jpg',
+    duration: '00:30',
+    category: 'Performance',
+  },
+  {
+    id: '10',
+    title: 'Pasta de Amendoim',
+    content: 'https://youtube.com/shorts/9jb2Plogiww?feature=share',
+    thumbnail: 'https://img.youtube.com/vi/9jb2Plogiww/0.jpg',
+    duration: '00:30',
+    category: 'Alimentação',
+  },
+];
 
 export default function TrainingListScreen() {
   const router = useRouter();
-  const [videos, setVideos] = useState<TrainingItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchVideos = async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('training_materials')
-        .select('*')
-        .eq('type', 'Video')
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        setVideos(data);
-      }
-      setLoading(false);
-    };
-
-    fetchVideos();
-  }, []);
 
   const handlePlayVideo = (url: string) => {
     router.push({ pathname: '/videoPlayer', params: { url } });
   };
 
-  const renderItem = ({ item }: { item: TrainingItem }) => (
+  const renderItem = ({ item }) => (
     <TouchableOpacity style={styles.card} onPress={() => handlePlayVideo(item.content)}>
-      <Image source={{ uri: item.thumbnail || 'https://via.placeholder.com/100x100' }} style={styles.thumbnail} />
+      <Image source={{ uri: item.thumbnail }} style={styles.thumbnail} />
       <View style={styles.details}>
         <Text style={styles.title}>{item.title}</Text>
         <View style={styles.metaRow}>
@@ -63,20 +115,11 @@ export default function TrainingListScreen() {
     </TouchableOpacity>
   );
 
-  if (loading) {
-    return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={{ marginTop: 8, color: COLORS.textSecondary }}>Carregando vídeos...</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       <Text style={styles.heading}>Vídeos de Treinamento</Text>
       <FlatList
-        data={videos}
+        data={staticVideos}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
@@ -131,10 +174,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
     marginLeft: 4,
-  },
-  loader: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });
