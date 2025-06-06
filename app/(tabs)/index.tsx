@@ -110,6 +110,12 @@ export default function DashboardScreen() {
     fetchDashboardData();
   }, [router, user]);
 
+  const images = [
+    require('@/assets/images/ataque1.jpeg'),
+    require('@/assets/images/ataque2.jpeg'),
+    require('@/assets/images/ataque3.jpeg'),
+  ];
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -202,7 +208,7 @@ export default function DashboardScreen() {
         <View style={styles.promotionContainer}>
           <Text style={styles.promotionTitle}>Promoção da Semana!</Text>
           <Text style={styles.promotionText}>
-            Venda Whey Protein e ganhe comissão especial de 25%!
+            Combo Viper de R$ 349,00 por 249,90
           </Text>
 
           <ScrollView
@@ -211,10 +217,10 @@ export default function DashboardScreen() {
             showsHorizontalScrollIndicator={false}
             style={styles.carousel}
           >
-            {['ataque1.jpeg', 'ataque2.jpeg', 'ataque3.jpeg'].map((img, idx) => (
+            {images.map((img, idx) => (
               <Image
                 key={idx}
-                source={require(`@/assets/images/${img}`)}
+                source={img}
                 style={styles.carouselImage}
                 resizeMode="cover"
               />
@@ -310,7 +316,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   carouselImage: {
-    width: Dimensions.get('window').width - 40,
+    width: Dimensions.get('window').width - 280,
     height: 180,
     borderRadius: 12,
     marginRight: 10,
