@@ -45,6 +45,35 @@ export default function DashboardScreen() {
     }
   };
 
+  const handlePromoClick = async (productId: string) => {
+    const supabase = createClient();
+
+    const { data: product, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', productId)
+      .single();
+
+    if (error || !product) {
+      console.error('Erro ao buscar produto da promoção:', error);
+      return;
+    }
+
+    router.push({
+      pathname: '/order/new',
+      params: {
+        id: product.id,
+        name: product.name ?? '',
+        price: product.price?.toString() ?? '0',
+        stock: product.stock?.toString() ?? '0',
+        description: product.description ?? '',
+        category: product.category ?? '',
+        image_url: product.image_url ?? '',
+        quantity: '1',
+      },
+    });
+  };
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -110,10 +139,19 @@ export default function DashboardScreen() {
     fetchDashboardData();
   }, [router, user]);
 
-  const images = [
-    require('@/assets/images/ataque1.jpeg'),
-    require('@/assets/images/ataque2.jpeg'),
-    require('@/assets/images/ataque3.jpeg'),
+  const promoProducts = [
+    {
+      id: 'f880483a-1b7c-47b1-8f22-740f361a0828',
+      image: require('@/assets/images/ataque1.jpeg'),
+    },
+    {
+      id: 'f880483a-1b7c-47b1-8f22-740f361a0828',
+      image: require('@/assets/images/ataque2.jpeg'),
+    },
+    {
+      id: 'f880483a-1b7c-47b1-8f22-740f361a0828',
+      image: require('@/assets/images/ataque3.jpeg'),
+    },
   ];
 
   return (
@@ -217,13 +255,14 @@ export default function DashboardScreen() {
             showsHorizontalScrollIndicator={false}
             style={styles.carousel}
           >
-            {images.map((img, idx) => (
-              <Image
-                key={idx}
-                source={img}
-                style={styles.carouselImage}
-                resizeMode="cover"
-              />
+            {promoProducts.map((item, idx) => (
+              <TouchableOpacity key={idx} onPress={() => handlePromoClick(item.id)}>
+                <Image
+                  source={item.image}
+                  style={styles.carouselImage}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
