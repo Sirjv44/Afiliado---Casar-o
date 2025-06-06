@@ -6,6 +6,7 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/Colors';
@@ -203,6 +204,22 @@ export default function DashboardScreen() {
           <Text style={styles.promotionText}>
             Venda Whey Protein e ganhe comissão especial de 25%!
           </Text>
+
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            style={styles.carousel}
+          >
+            {['ataque1.jpeg', 'ataque2.jpeg', 'ataque3.jpeg'].map((img, idx) => (
+              <Image
+                key={idx}
+                source={require(`@/assets/images/${img}`)}
+                style={styles.carouselImage}
+                resizeMode="cover"
+              />
+            ))}
+          </ScrollView>
         </View>
 
         {recentSales.length > 0 && (
@@ -285,6 +302,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary,
     lineHeight: 20,
+  },
+  carousel: {
+    marginTop: 16,
+    height: 180,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  carouselImage: {
+    width: Dimensions.get('window').width - 40,
+    height: 180,
+    borderRadius: 12,
+    marginRight: 10,
   },
   salesFeed: {
     backgroundColor: COLORS.cardAlt,
