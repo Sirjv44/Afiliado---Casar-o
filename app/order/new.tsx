@@ -368,22 +368,22 @@ export default function NewOrderScreen() {
     notes: '',
   });
 
-  useEffect(() => {
-    if (params?.id) {
-      const product = {
-        id: String(params.id),
-        name: String(params.name),
-        price: Number(params.price),
-        stock: Number(params.stock),
-        description: String(params.description),
-        category: String(params.category),
-        image_url: String(params.image_url),
-        quantity: 1,
-      };
 
-      setCartItems([product]);
+  useEffect(() => {
+    if (products.length === 0 || !params?.id) return;
+  
+    const existingItem = cartItems.find((item) => item.id === params.id);
+    if (existingItem) return;
+  
+    const matchedProduct = products.find((p) => p.id === params.id);
+    if (matchedProduct) {
+      setCartItems((prev) => [...prev, { ...matchedProduct, quantity: 1 }]);
     }
-  }, []);
+  }, [products, params?.id]);
+  
+  
+  
+  
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -1145,4 +1145,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 8,
   },
-});
+}); 
