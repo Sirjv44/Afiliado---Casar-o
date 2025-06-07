@@ -65,18 +65,10 @@ export default function CatalogScreen() {
   }, [products, selectedCategory, searchText]);
 
   const handleAddToCart = (product: Product) => {
+    // Agora envia apenas o ID do produto
     router.push({
       pathname: '/order/new',
-      params: {
-        id: product.id,
-        name: product.name,
-        price: String(product.price),
-        stock: String(product.stock),
-        description: product.description,
-        category: product.category,
-        image_url: product.image_url,
-        quantity: '1',
-      },
+      params: { id: product.id },
     });
   };
 

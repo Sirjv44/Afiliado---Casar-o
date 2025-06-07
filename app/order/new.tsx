@@ -584,7 +584,8 @@ export default function NewOrderScreen() {
         }
       }
 
-      const highCommissionKeywords = ['tribulus', 'maca peruana', 'provitalis', 'cindura', 'ioimbina'];
+      const highCommissionKeywords = ['tribulus', 'maca peruana', 'provitalis', 'cindura', 'ioimbina', 'viper'];
+
 
 const commissionsToInsert = cartItems.map((item) => {
   const name = item.name.toLowerCase();

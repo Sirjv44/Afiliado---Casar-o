@@ -50,7 +50,7 @@ export default function DashboardScreen() {
 
     const { data: product, error } = await supabase
       .from('products')
-      .select('*')
+      .select('id') // só confirmamos se existe
       .eq('id', productId)
       .single();
 
@@ -59,18 +59,10 @@ export default function DashboardScreen() {
       return;
     }
 
+    // redireciona apenas com o ID
     router.push({
       pathname: '/order/new',
-      params: {
-        id: product.id,
-        name: product.name ?? '',
-        price: product.price?.toString() ?? '0',
-        stock: product.stock?.toString() ?? '0',
-        description: product.description ?? '',
-        category: product.category ?? '',
-        image_url: product.image_url ?? '',
-        quantity: '1',
-      },
+      params: { id: product.id },
     });
   };
 
