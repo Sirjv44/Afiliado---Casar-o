@@ -15,7 +15,7 @@ import { createClient } from '@/lib/supabase';
 export default function OrderDetailScreen() {
   const { order_id } = useLocalSearchParams();
   const [products, setProducts] = useState([]);
-  const [orderInfo, setOrderInfo] = useState({ client_address: '', notes: '' });
+  const [orderInfo, setOrderInfo] = useState({ client_address: '', notes: '', client_phone: '' });
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
 
@@ -36,7 +36,7 @@ export default function OrderDetailScreen() {
 
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
-        .select('client_address, notes')
+        .select('client_address, notes, client_phone')
         .eq('id', order_id)
         .single();
 
@@ -80,6 +80,9 @@ export default function OrderDetailScreen() {
 
         <Text style={styles.infoLabel}>Observações:</Text>
         <Text style={styles.infoText}>{orderInfo.notes || 'Nenhuma observação'}</Text>
+
+        <Text style={styles.infoLabel}>Telefone:</Text>
+        <Text style={styles.infoText}>{orderInfo.client_phone || 'Não informado'}</Text>
       </View>
 
       <TextInput
