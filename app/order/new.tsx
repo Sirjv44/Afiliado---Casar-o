@@ -287,9 +287,9 @@ const ProductSelection = memo(({
 
         {Array.isArray(cartItems) && cartItems.length > 0 ? (
 
-          <View style={styles.cartContent}>
+          <ScrollView style={styles.cartContent} contentContainerStyle={{ paddingBottom: 12 }}>
             {cartItems.map((item) => (
-              <View key={item.id} style={styles.cartItem}>
+            <View key={item.id} style={styles.cartItem}>
                 <View style={styles.cartItemInfo}>
                   <Text style={styles.cartItemName}>{item.name}</Text>
                   <Text style={styles.cartItemPrice}>
@@ -328,11 +328,11 @@ const ProductSelection = memo(({
               </View>
             ))}
 
-            <View style={styles.subtotal}>
-              <Text style={styles.subtotalLabel}>Subtotal:</Text>
-              <Text style={styles.subtotalValue}>R$ {subtotal.toFixed(2)}</Text>
-            </View>
+        <View style={styles.subtotal}>
+            <Text style={styles.subtotalLabel}>Subtotal:</Text>
+            <Text style={styles.subtotalValue}>R$ {subtotal.toFixed(2)}</Text>
           </View>
+        </ScrollView>
         ) : (
           <View style={styles.emptyCart}>
             <Text style={styles.emptyCartText}>Seu carrinho está vazio</Text>
