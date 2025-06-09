@@ -9,10 +9,9 @@ import {
 import { COLORS } from '@/constants/Colors';
 import { ShoppingBag, ChevronRight, Plus } from 'lucide-react-native';
 import { useFocusEffect, router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient } from '@/lib/supabase'; // <- ajuste aqui
+import { createClient } from '@/lib/supabase';
 
-const supabase = createClient(); // <- crie o cliente aqui
+const supabase = createClient();
 
 interface Order {
   id: string;
@@ -29,7 +28,7 @@ const statusLabels = {
   shipped: 'Enviado',
   delivered: 'Entregue',
   canceled: 'Cancelado',
-};
+} as const;
 
 const statusColors = {
   pending: COLORS.warning,
@@ -37,14 +36,14 @@ const statusColors = {
   shipped: COLORS.info,
   delivered: COLORS.success,
   canceled: COLORS.error,
-};
+} as const;
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
 
   const loadOrders = async () => {
     try {
-      // 1. Obter usuário logado
+      // 1. Sessão do usuário
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
 
@@ -55,38 +54,59 @@ export default function OrdersScreen() {
 
       const userId = sessionData.session.user.id;
 
-      // 2. Buscar pedidos apenas do usuário logado
-      const { data: ordersData, error: ordersError } = await supabase
+      // 2. Checar se é admin
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('admin')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) {
+        console.error('Erro ao buscar perfil:', profileError.message);
+        return;
+      }
+
+      const isAdmin = profileData?.admin === true;
+
+      // 3. Buscar pedidos (todos se admin, senão apenas do usuário)
+      let ordersQuery = supabase
         .from('orders')
-        .select('id, client_name, created_at, total_amount, status')
-        .eq('affiliate_id', userId)
-        .order('created_at', { ascending: false });
+        .select('id, client_name, created_at, total_amount, status, affiliate_id');
+
+      if (!isAdmin) {
+        ordersQuery = ordersQuery.eq('affiliate_id', userId);
+      }
+
+      ordersQuery = ordersQuery.order('created_at', { ascending: false });
+
+      const { data: ordersData, error: ordersError } = await ordersQuery;
 
       if (ordersError) {
         console.error('Erro ao buscar pedidos:', ordersError.message);
         return;
       }
-
       if (!ordersData) return;
 
-      // 3. Buscar os itens de todos os pedidos
+      // 4. Buscar itens de todos os pedidos retornados
+      const orderIds = ordersData.map((o) => o.id);
       const { data: orderItemsData, error: itemsError } = await supabase
         .from('order_items')
-        .select('order_id, quantity');
+        .select('order_id, quantity')
+        .in('order_id', orderIds);
 
       if (itemsError) {
         console.error('Erro ao buscar itens dos pedidos:', itemsError.message);
         return;
       }
 
-      // 4. Mapear order_id => total de itens
+      // 5. Mapear order_id => total de itens
       const itemCounts: Record<string, number> = {};
       orderItemsData?.forEach((item) => {
         const orderId = item.order_id;
         itemCounts[orderId] = (itemCounts[orderId] ?? 0) + (item.quantity ?? 0);
       });
 
-      // 5. Montar dados para a tela
+      // 6. Transformar dados para a tela
       const transformed: Order[] = ordersData.map((order: any) => ({
         id: order.id,
         clientName: order.client_name ?? 'Cliente não informado',
@@ -207,7 +227,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
-    paddingBottom: 80, // Extra padding for FAB
+    paddingBottom: 80, // espaço extra para o FAB
   },
   emptyContainer: {
     flex: 1,
