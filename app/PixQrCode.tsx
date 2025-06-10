@@ -95,20 +95,29 @@ export default function AffiliatePixScreen() {
     function removerAcentos(str) {
       return str.normalize('NFD').replace(/[̀-ͯ]/g, '');
     }
-
+  
     function format(id, value) {
       const length = value.length.toString().padStart(2, '0');
       return `${id}${length}${value}`;
     }
-
+  
+    function formatarTelefoneComoChavePix(chave) {
+      const apenasNumeros = chave.replace(/\D/g, '');
+      if (apenasNumeros.length === 11) {
+        return `+55${apenasNumeros}`;
+      }
+      return chave; // já está no formato esperado
+    }
+  
+    const chaveFormatada = formatarTelefoneComoChavePix(chave);
     const nomeLimpo = removerAcentos(nome).trim().substring(0, 25);
     const cidadeLimpa = removerAcentos(cidade).trim().substring(0, 15);
     const valorFormatado = valor.toFixed(2);
-
+  
     const gui = format('00', 'br.gov.bcb.pix');
-    const key = format('01', chave);
+    const key = format('01', chaveFormatada);
     const merchantAccount = format('26', gui + key);
-
+  
     const payloadSemCRC =
       '000201' +
       merchantAccount +
@@ -120,10 +129,11 @@ export default function AffiliatePixScreen() {
       format('60', cidadeLimpa) +
       format('62', format('05', '***')) +
       '6304';
-
+  
     const crc = calcularCRC16(payloadSemCRC);
     return payloadSemCRC + crc;
   }
+  
 
   function calcularCRC16(payload) {
     let crc = 0xffff;
