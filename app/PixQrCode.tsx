@@ -95,29 +95,78 @@ export default function AffiliatePixScreen() {
     function removerAcentos(str) {
       return str.normalize('NFD').replace(/[̀-ͯ]/g, '');
     }
-  
+
     function format(id, value) {
       const length = value.length.toString().padStart(2, '0');
       return `${id}${length}${value}`;
     }
-  
-    function formatarTelefoneComoChavePix(chave) {
-      const apenasNumeros = chave.replace(/\D/g, '');
-      if (apenasNumeros.length === 11) {
+
+    function validarCPF(cpf) {
+      if (!cpf || cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+
+      let soma = 0;
+      for (let i = 0; i < 9; i++) {
+        soma += parseInt(cpf.charAt(i)) * (10 - i);
+      }
+
+      let resto = (soma * 10) % 11;
+      if (resto === 10 || resto === 11) resto = 0;
+      if (resto !== parseInt(cpf.charAt(9))) return false;
+
+      soma = 0;
+      for (let i = 0; i < 10; i++) {
+        soma += parseInt(cpf.charAt(i)) * (11 - i);
+      }
+
+      resto = (soma * 10) % 11;
+      if (resto === 10 || resto === 11) resto = 0;
+      if (resto !== parseInt(cpf.charAt(10))) return false;
+
+      return true;
+    }
+
+    function formatarChavePix(chave) {
+      const chaveLimpa = chave.trim();
+      const apenasNumeros = chaveLimpa.replace(/\D/g, '');
+
+      // CPF
+      if (apenasNumeros.length === 11 && validarCPF(apenasNumeros)) {
+        return apenasNumeros;
+      }
+
+      // Telefone
+      if (/^\d{11}$/.test(apenasNumeros)) {
         return `+55${apenasNumeros}`;
       }
-      return chave; // já está no formato esperado
+
+      // CNPJ
+      if (/^\d{14}$/.test(apenasNumeros)) {
+        return apenasNumeros;
+      }
+
+      // E-mail
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(chaveLimpa)) {
+        return chaveLimpa;
+      }
+
+      // Chave aleatória
+      if (chaveLimpa.length >= 32) {
+        return chaveLimpa;
+      }
+
+      // Fallback
+      return chaveLimpa;
     }
-  
-    const chaveFormatada = formatarTelefoneComoChavePix(chave);
+
+    const chaveFormatada = formatarChavePix(chave);
     const nomeLimpo = removerAcentos(nome).trim().substring(0, 25);
     const cidadeLimpa = removerAcentos(cidade).trim().substring(0, 15);
     const valorFormatado = valor.toFixed(2);
-  
+
     const gui = format('00', 'br.gov.bcb.pix');
     const key = format('01', chaveFormatada);
     const merchantAccount = format('26', gui + key);
-  
+
     const payloadSemCRC =
       '000201' +
       merchantAccount +
@@ -129,11 +178,10 @@ export default function AffiliatePixScreen() {
       format('60', cidadeLimpa) +
       format('62', format('05', '***')) +
       '6304';
-  
+
     const crc = calcularCRC16(payloadSemCRC);
     return payloadSemCRC + crc;
   }
-  
 
   function calcularCRC16(payload) {
     let crc = 0xffff;

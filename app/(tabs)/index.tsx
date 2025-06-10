@@ -50,7 +50,7 @@ export default function DashboardScreen() {
 
     const { data: product, error } = await supabase
       .from('products')
-      .select('id') // só confirmamos se existe
+      .select('id')
       .eq('id', productId)
       .single();
 
@@ -59,7 +59,6 @@ export default function DashboardScreen() {
       return;
     }
 
-    // redireciona apenas com o ID
     router.push({
       pathname: '/order/new',
       params: { id: product.id },
@@ -230,6 +229,11 @@ export default function DashboardScreen() {
                 title="Alterar Produtos"
                 onPress={() => router.push('/admin/AlterarProdutos')}
                 icon={<Settings size={20} color="#FFFFFF" />}
+              />
+              <ActionButton
+                title="Alterar Cadastros"
+                onPress={() => router.push('/admin/Usuarios')}
+                icon={<Users size={20} color="#FFFFFF" />}
               />
             </View>
           </>
