@@ -15,14 +15,40 @@ import { createClient } from '@/lib/supabase';
 export default function OrderDetailScreen() {
   const { order_id } = useLocalSearchParams();
   const [products, setProducts] = useState([]);
-  const [orderInfo, setOrderInfo] = useState({ client_address: '', notes: '', client_phone: '' });
+  const [orderInfo, setOrderInfo] = useState({
+    client_address: '',
+    notes: '',
+    client_phone: '',
+    affiliate_name: '',
+  });
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
       const supabase = createClient();
 
+      // Verifica se é admin
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user?.id;
+
+      if (!userId) {
+        console.error('Usuário não autenticado');
+        setLoading(false);
+        return;
+      }
+
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('admin')
+        .eq('id', userId)
+        .single();
+
+      const isAdminUser = profileData?.admin === true;
+      setIsAdmin(isAdminUser);
+
+      // Buscar produtos do pedido
       const { data: itemsData, error: itemsError } = await supabase
         .from('order_items')
         .select('quantity, price, products (name, image_url, description)')
@@ -34,16 +60,22 @@ export default function OrderDetailScreen() {
         setProducts(itemsData);
       }
 
+      // Buscar dados do pedido + afiliado
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
-        .select('client_address, notes, client_phone')
+        .select('client_address, notes, client_phone, profiles(full_name)')
         .eq('id', order_id)
         .single();
 
       if (orderError) {
         console.error('Erro ao buscar informações do pedido:', orderError.message);
       } else if (orderData) {
-        setOrderInfo(orderData);
+        setOrderInfo({
+          client_address: orderData.client_address,
+          notes: orderData.notes,
+          client_phone: orderData.client_phone,
+          affiliate_name: orderData.profiles?.full_name || '',
+        });
       }
 
       setLoading(false);
@@ -83,6 +115,13 @@ export default function OrderDetailScreen() {
 
         <Text style={styles.infoLabel}>Telefone:</Text>
         <Text style={styles.infoText}>{orderInfo.client_phone || 'Não informado'}</Text>
+
+        {isAdmin && orderInfo.affiliate_name && (
+          <>
+            <Text style={styles.infoLabel}>Afiliado:</Text>
+            <Text style={styles.infoText}>{orderInfo.affiliate_name}</Text>
+          </>
+        )}
       </View>
 
       <TextInput

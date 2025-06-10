@@ -20,6 +20,7 @@ interface Order {
   totalAmount: number;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'canceled';
   items: number;
+  affiliateName?: string;
 }
 
 const statusLabels = {
@@ -40,10 +41,10 @@ const statusColors = {
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const loadOrders = async () => {
     try {
-      // 1. Sessão do usuário
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
 
@@ -54,7 +55,6 @@ export default function OrdersScreen() {
 
       const userId = sessionData.session.user.id;
 
-      // 2. Checar se é admin
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('admin')
@@ -66,18 +66,25 @@ export default function OrdersScreen() {
         return;
       }
 
-      const isAdmin = profileData?.admin === true;
+      const isAdminUser = profileData?.admin === true;
+      setIsAdmin(isAdminUser);
 
-      // 3. Buscar pedidos (todos se admin, senão apenas do usuário)
       let ordersQuery = supabase
         .from('orders')
-        .select('id, client_name, created_at, total_amount, status, affiliate_id');
+        .select(`
+          id,
+          client_name,
+          created_at,
+          total_amount,
+          status,
+          affiliate_id,
+          profiles (full_name)
+        `)
+        .order('created_at', { ascending: false });
 
-      if (!isAdmin) {
+      if (!isAdminUser) {
         ordersQuery = ordersQuery.eq('affiliate_id', userId);
       }
-
-      ordersQuery = ordersQuery.order('created_at', { ascending: false });
 
       const { data: ordersData, error: ordersError } = await ordersQuery;
 
@@ -87,7 +94,6 @@ export default function OrdersScreen() {
       }
       if (!ordersData) return;
 
-      // 4. Buscar itens de todos os pedidos retornados
       const orderIds = ordersData.map((o) => o.id);
       const { data: orderItemsData, error: itemsError } = await supabase
         .from('order_items')
@@ -99,24 +105,22 @@ export default function OrdersScreen() {
         return;
       }
 
-      // 5. Mapear order_id => total de itens
       const itemCounts: Record<string, number> = {};
       orderItemsData?.forEach((item) => {
         const orderId = item.order_id;
         itemCounts[orderId] = (itemCounts[orderId] ?? 0) + (item.quantity ?? 0);
       });
 
-      // 6. Transformar dados para a tela
       const transformed: Order[] = ordersData.map((order: any) => ({
         id: order.id,
         clientName: order.client_name ?? 'Cliente não informado',
         date: order.created_at
           ? new Date(order.created_at).toLocaleDateString('pt-BR')
           : '',
-        totalAmount:
-          typeof order.total_amount === 'number' ? order.total_amount : 0,
+        totalAmount: typeof order.total_amount === 'number' ? order.total_amount : 0,
         status: order.status ?? 'pending',
         items: itemCounts[order.id] ?? 0,
+        affiliateName: order.profiles?.full_name ?? '',
       }));
 
       setOrders(transformed);
@@ -148,6 +152,9 @@ export default function OrdersScreen() {
         <View style={styles.orderInfo}>
           <Text style={styles.clientName}>{item.clientName}</Text>
           <Text style={styles.orderId}>Pedido #{item.id}</Text>
+          {isAdmin && item.affiliateName ? (
+            <Text style={styles.affiliateName}>Afiliado: {item.affiliateName}</Text>
+          ) : null}
         </View>
         <ChevronRight size={20} color={COLORS.textSecondary} />
       </View>
@@ -227,7 +234,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
-    paddingBottom: 80, // espaço extra para o FAB
+    paddingBottom: 80,
   },
   emptyContainer: {
     flex: 1,
@@ -289,6 +296,10 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   orderId: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  affiliateName: {
     fontSize: 12,
     color: COLORS.textSecondary,
   },
