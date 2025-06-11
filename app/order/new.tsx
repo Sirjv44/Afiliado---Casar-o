@@ -148,7 +148,7 @@ const OrderReview = ({
   handleSubmitOrder,
   isLoading,
 }) => (
-  <View style={styles.stepContainer}>
+  <ScrollView style={styles.stepContainer} contentContainerStyle={{ paddingBottom: 24 }}>
     <Text style={styles.reviewTitle}>Revise seu Pedido</Text>
 
     <View style={styles.reviewSection}>
@@ -217,8 +217,9 @@ const OrderReview = ({
         )}
       </TouchableOpacity>
     </View>
-  </View>
+  </ScrollView>
 );
+
 
 const ProductSelection = memo(({
   filteredProducts = [],
@@ -1084,7 +1085,11 @@ const styles = StyleSheet.create({
     flex: 1,
     color: COLORS.text,
     fontSize: 14,
-  },
+    flexWrap: 'wrap',
+    flexShrink: 1,
+    minWidth: 0, // <-- permite quebra interna da palavra
+  },  
+  
   reviewProductItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
