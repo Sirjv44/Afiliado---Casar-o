@@ -231,6 +231,11 @@ export default function DashboardScreen() {
                 icon={<Settings size={20} color="#FFFFFF" />}
               />
               <ActionButton
+                title="Alterar Pedidos"
+                onPress={() => router.push('/admin/AlterarPedidos')}
+                icon={<Settings size={20} color="#FFFFFF" />}
+              />
+              <ActionButton
                 title="Alterar Cadastros"
                 onPress={() => router.push('/admin/Usuarios')}
                 icon={<Users size={20} color="#FFFFFF" />}
