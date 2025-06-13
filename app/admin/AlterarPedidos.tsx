@@ -50,14 +50,31 @@ export default function AdminPedidosScreen() {
 
   const atualizarStatus = async (id, novoStatus) => {
     const supabase = createClient();
-    const { error } = await supabase.from('orders').update({ status: novoStatus }).eq('id', id);
 
-    if (error) {
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({ status: novoStatus })
+      .eq('id', id);
+
+    if (updateError) {
       exibirMensagem('❌ Erro ao atualizar o status.');
-    } else {
-      exibirMensagem(`✅ Status atualizado para ${traduzirStatus(novoStatus)}`);
-      fetchPedidos();
+      return;
     }
+
+    if (novoStatus === 'canceled') {
+      const { error: deleteCommissionsError } = await supabase
+        .from('commissions')
+        .delete()
+        .eq('order_id', id);
+
+      if (deleteCommissionsError) {
+        exibirMensagem('❌ Status atualizado, mas houve erro ao excluir comissões.');
+        return;
+      }
+    }
+
+    exibirMensagem(`✅ Status atualizado para ${traduzirStatus(novoStatus)}`);
+    fetchPedidos();
   };
 
   const excluirPedido = async (id) => {
