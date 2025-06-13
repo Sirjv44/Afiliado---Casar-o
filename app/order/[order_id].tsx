@@ -24,6 +24,7 @@ export default function OrderDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [commissionStatus, setCommissionStatus] = useState<'paid' | 'pending' | 'partial' | null>(null);
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -78,6 +79,27 @@ export default function OrderDetailScreen() {
         });
       }
 
+      // Buscar comissões do pedido
+      const { data: commissionsData, error: commissionsError } = await supabase
+        .from('commissions')
+        .select('status')
+        .eq('order_id', order_id);
+
+      if (commissionsError) {
+        console.error('Erro ao buscar comissões:', commissionsError.message);
+      } else {
+        if (commissionsData.length === 0) {
+          setCommissionStatus(null);
+        } else {
+          const allPaid = commissionsData.every(c => c.status === 'paid');
+          const allPending = commissionsData.every(c => c.status !== 'paid');
+
+          if (allPaid) setCommissionStatus('paid');
+          else if (allPending) setCommissionStatus('pending');
+          else setCommissionStatus('partial');
+        }
+      }
+
       setLoading(false);
     };
 
@@ -120,6 +142,28 @@ export default function OrderDetailScreen() {
           <>
             <Text style={styles.infoLabel}>Afiliado:</Text>
             <Text style={styles.infoText}>{orderInfo.affiliate_name}</Text>
+          </>
+        )}
+
+        {isAdmin && commissionStatus && (
+          <>
+            <Text style={styles.infoLabel}>Comissão:</Text>
+            <Text
+              style={[
+                styles.infoText,
+                commissionStatus === 'paid'
+                  ? { color: 'green' }
+                  : commissionStatus === 'partial'
+                  ? { color: 'orange' }
+                  : { color: 'red' },
+              ]}
+            >
+              {commissionStatus === 'paid'
+                ? 'Paga'
+                : commissionStatus === 'partial'
+                ? 'Parcialmente paga'
+                : 'Pendente'}
+            </Text>
           </>
         )}
       </View>
