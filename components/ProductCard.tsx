@@ -10,7 +10,7 @@ export interface Product {
   name: string;
   price: number;
   stock: number;
-  description: string;
+  description: string | null;
   category: string;
   image_url: string;
 }
@@ -25,6 +25,9 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
   const { user } = useAuth();
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoadingFavorite, setIsLoadingFavorite] = useState(false);
+  const [showFullDescription, setShowFullDescription] = useState(false);
+
+  const descriptionLimit = 100; // limite de caracteres
 
   useEffect(() => {
     const checkFavorite = async () => {
@@ -88,6 +91,16 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
     setIsLoadingFavorite(false);
   };
 
+  const getDescriptionText = () => {
+    const description = product.description ?? '';
+
+    if (showFullDescription || description.length <= descriptionLimit) {
+      return description;
+    } else {
+      return description.substring(0, descriptionLimit) + '...';
+    }
+  };
+
   return (
     <TouchableOpacity style={styles.card} onPress={() => onViewDetails(product)} activeOpacity={0.9}>
       <Image source={{ uri: product.image_url }} style={styles.image} />
@@ -104,7 +117,18 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
           <Text style={styles.stock}>{product.stock} em estoque</Text>
         </View>
 
-        <Text style={styles.description} numberOfLines={2}>{product.description}</Text>
+        {product.description && (
+          <>
+            <Text style={styles.description}>{getDescriptionText()}</Text>
+            {product.description.length > descriptionLimit && (
+              <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)}>
+                <Text style={styles.showMoreText}>
+                  {showFullDescription ? 'Mostrar menos' : 'Mostrar mais'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
 
         <View style={styles.actions}>
           <TouchableOpacity style={styles.addButton} onPress={() => onAddToCart(product)}>
@@ -183,8 +207,14 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 14,
     color: COLORS.textSecondary,
-    marginBottom: 16,
+    marginBottom: 8,
     lineHeight: 20,
+  },
+  showMoreText: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 12,
   },
   actions: {
     flexDirection: 'row',

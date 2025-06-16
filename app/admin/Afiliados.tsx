@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 import { router } from 'expo-router';
@@ -15,6 +16,8 @@ import { createClient } from '@/lib/supabase';
 export default function AffiliatesScreen() {
   const { user } = useAuth();
   const [affiliates, setAffiliates] = useState([]);
+  const [filteredAffiliates, setFilteredAffiliates] = useState([]);
+  const [searchText, setSearchText] = useState('');
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -54,6 +57,7 @@ export default function AffiliatesScreen() {
         console.error('Erro ao buscar afiliados:', error.message);
       } else {
         setAffiliates(data);
+        setFilteredAffiliates(data); // Inicializa com todos
       }
 
       setLoading(false);
@@ -65,6 +69,13 @@ export default function AffiliatesScreen() {
       setLoading(false);
     }
   }, [user?.id, isAdmin]);
+
+  useEffect(() => {
+    const filtered = affiliates.filter((affiliate) =>
+      affiliate.full_name.toLowerCase().includes(searchText.toLowerCase())
+    );
+    setFilteredAffiliates(filtered);
+  }, [searchText, affiliates]);
 
   if (loading || isAdmin === null) {
     return (
@@ -87,10 +98,19 @@ export default function AffiliatesScreen() {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Afiliados</Text>
-      {affiliates.length === 0 ? (
+
+      <TextInput
+        style={styles.input}
+        placeholder="Pesquisar por nome..."
+        placeholderTextColor={COLORS.textSecondary}
+        value={searchText}
+        onChangeText={setSearchText}
+      />
+
+      {filteredAffiliates.length === 0 ? (
         <Text style={styles.errorText}>Nenhum afiliado encontrado.</Text>
       ) : (
-        affiliates.map((affiliate) => (
+        filteredAffiliates.map((affiliate) => (
           <TouchableOpacity
             key={affiliate.id}
             style={styles.card}
@@ -119,6 +139,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 16,
     color: COLORS.text,
+  },
+  input: {
+    backgroundColor: COLORS.cardAlt,
+    color: COLORS.text,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 16,
   },
   card: {
     backgroundColor: COLORS.card,
