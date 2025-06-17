@@ -1,63 +1,63 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { COLORS } from '@/constants/Colors';
+import { useRouter, useGlobalSearchParams } from 'expo-router';
 import { createClient } from '@/lib/supabase';
+import { COLORS } from '@/constants/Colors';
 
 const supabase = createClient();
 
 export default function ResetPasswordScreen() {
   const [newPassword, setNewPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const params = useGlobalSearchParams();
 
   useEffect(() => {
-    // O Supabase já trata o token de redefinição automaticamente
-    const handleSession = async () => {
-      const { error } = await supabase.auth.refreshSession();
-      if (error) {
-        Alert.alert('Erro', 'Link inválido ou expirado. Solicite uma nova recuperação.');
-        router.replace('/'); // Redireciona de volta para o login
+    const hash = window?.location?.hash;
+    if (hash && hash.includes('type=recovery')) {
+      const query = new URLSearchParams(hash.replace('#', ''));
+      const access_token = query.get('access_token');
+
+      if (access_token) {
+        supabase.auth.setSession({ access_token, refresh_token: '' });
       }
-    };
-    handleSession();
+    }
   }, []);
 
-  const handlePasswordReset = async () => {
-    if (!newPassword || newPassword.length < 6) {
-      Alert.alert('Erro', 'A nova senha deve ter pelo menos 6 caracteres.');
+  const handleSubmit = async () => {
+    if (newPassword.length < 6) {
+      Alert.alert('Erro', 'A senha deve ter pelo menos 6 caracteres.');
       return;
     }
 
-    setIsLoading(true);
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
 
-    setIsLoading(false);
-
-    if (error) {
-      console.error(error);
-      Alert.alert('Erro', 'Não foi possível redefinir a senha.');
-    } else {
-      Alert.alert('Sucesso', 'Senha redefinida com sucesso!');
-      router.replace('/');
+      if (error) {
+        Alert.alert('Erro', 'Não foi possível redefinir a senha.');
+      } else {
+        Alert.alert('Sucesso', 'Senha redefinida com sucesso!');
+        router.replace('/');
+      }
+    } catch (e) {
+      Alert.alert('Erro', 'Falha ao redefinir senha.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Redefinir Senha</Text>
-      <Text style={styles.subtitle}>Digite sua nova senha abaixo:</Text>
-
       <TextInput
         style={styles.input}
         placeholder="Nova senha"
@@ -65,13 +65,8 @@ export default function ResetPasswordScreen() {
         value={newPassword}
         onChangeText={setNewPassword}
       />
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={handlePasswordReset}
-        disabled={isLoading}
-      >
-        {isLoading ? (
+      <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
+        {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
           <Text style={styles.buttonText}>Salvar nova senha</Text>
@@ -92,13 +87,7 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: COLORS.textSecondary,
-    marginBottom: 24,
+    marginBottom: 16,
     textAlign: 'center',
   },
   input: {
