@@ -50,61 +50,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const supabase = createClient();
 
-  const handleSession = async (session: any | null) => {
-    if (session) {
-      const userId = session.user.id;
-
-      const { data: userData, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (userData) {
-        const user: User = {
-          id: userData.id,
-          email: userData.email,
-          fullName: userData.full_name,
-          phone: userData.phone,
-          cpf: userData.cpf,
-          address: userData.address,
-          pixKey: userData.pix_key,
-          admin: userData.admin ?? false,
-        };
-
-        setState({
-          user,
-          session,
-          isLoading: false,
-        });
-      } else {
-        console.error('Erro ao buscar perfil:', error);
-        setState({ user: null, session: null, isLoading: false });
-        router.replace('/(auth)/login');
-      }
-    } else {
-      setState({ user: null, session: null, isLoading: false });
-      router.replace('/(auth)/login');
-    }
-  };
-
   useEffect(() => {
-    const initialize = async () => {
-      const { data } = await supabase.auth.getSession();
-      await handleSession(data.session);
-    };
+    const loadSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
 
-    initialize();
+        if (session) {
+          const userId = session.user.id;
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        await handleSession(session);
+          const { data: userData, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .maybeSingle();
+
+          if (userData) {
+            const user: User = {
+              id: userData.id,
+              email: userData.email,
+              fullName: userData.full_name,
+              phone: userData.phone,
+              cpf: userData.cpf,
+              address: userData.address,
+              pixKey: userData.pix_key,
+              admin: userData.admin ?? false,
+            };
+
+            setState({
+              user,
+              session,
+              isLoading: false,
+            });
+          } else {
+            console.error('Erro ao buscar perfil:', error);
+            setState((prev) => ({ ...prev, isLoading: false }));
+          }
+        } else {
+          setState((prev) => ({ ...prev, isLoading: false }));
+        }
+      } catch (error) {
+        console.error('Erro ao carregar sessão:', error);
+        setState((prev) => ({ ...prev, isLoading: false }));
       }
-    );
-
-    return () => {
-      listener.subscription.unsubscribe();
     };
+
+    loadSession();
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -116,7 +106,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error || !data.user) throw new Error('Email ou senha incorretos.');
 
-      await handleSession(data.session);
+      const userId = data.user.id;
+
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (userError || !userData)
+        throw new Error('Perfil do usuário não encontrado.');
+
+      const user: User = {
+        id: userData.id,
+        email: userData.email,
+        fullName: userData.full_name,
+        phone: userData.phone,
+        cpf: userData.cpf,
+        address: userData.address,
+        pixKey: userData.pix_key,
+        admin: userData.admin ?? false,
+      };
+
+      setState({
+        user,
+        session: data.session,
+        isLoading: false,
+      });
+
       router.replace('/(tabs)/');
     } catch (error) {
       console.error('Erro no login:', error);

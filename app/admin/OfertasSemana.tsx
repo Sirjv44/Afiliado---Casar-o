@@ -31,13 +31,18 @@ export default function NovaOferta() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  const [productQuery, setProductQuery] = useState('');
+  const [productResults, setProductResults] = useState<any[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+
   useEffect(() => {
     if (id) {
       setTitle(paramTitle as string);
       setDescription(paramDescription as string);
       setStartDate(paramStart as string);
       setEndDate(paramEnd as string);
-      loadImages(id as string); // ✅ CORREÇÃO AQUI
+      loadImages(id as string);
+      loadOfferProduct(id as string);
     }
   }, [id]);
 
@@ -56,6 +61,34 @@ export default function NovaOferta() {
     }
   };
 
+  const loadOfferProduct = async (offerId: string) => {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('weekly_offers')
+      .select('product_id, products(name)')
+      .eq('id', offerId)
+      .single();
+
+    if (!error && data?.product_id) {
+      setSelectedProduct({ id: data.product_id, name: data.products?.name });
+    }
+  };
+
+  const handleProductSearch = async (query: string) => {
+    setProductQuery(query);
+    if (query.length < 3) {
+      setProductResults([]);
+      return;
+    }
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('products')
+      .select('id, name')
+      .ilike('name', `%${query}%`)
+      .limit(10);
+    setProductResults(data || []);
+  };
+
   const parseDateInput = (dateStr: string) => {
     const parsed = parse(dateStr, 'dd-MM-yyyy', new Date());
     return isValid(parsed) ? parsed : null;
@@ -69,7 +102,7 @@ export default function NovaOferta() {
   };
 
   const handleSaveOffer = async () => {
-    if (!title || !startDate || !endDate || imageUrls.length === 0) {
+    if (!title || !startDate || !endDate || imageUrls.length === 0 || !selectedProduct) {
       alert('Preencha todos os campos e adicione ao menos uma imagem.');
       return;
     }
@@ -98,6 +131,7 @@ export default function NovaOferta() {
             description,
             start_date: formattedStart,
             end_date: formattedEnd,
+            product_id: selectedProduct.id,
           })
           .eq('id', id);
 
@@ -116,6 +150,7 @@ export default function NovaOferta() {
             description,
             start_date: formattedStart,
             end_date: formattedEnd,
+            product_id: selectedProduct.id,
           })
           .select()
           .single();
@@ -182,6 +217,41 @@ export default function NovaOferta() {
         multiline
         placeholder="Digite a descrição da oferta"
       />
+
+      <Text style={styles.label}>Produto (busque pelo nome)</Text>
+      {selectedProduct ? (
+        <View style={styles.selectedProduct}>
+          <Text style={styles.selectedProductText}>{selectedProduct.name}</Text>
+          <TouchableOpacity onPress={() => setSelectedProduct(null)}>
+            <Text style={styles.removeButtonText}>❌</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <>
+          <TextInput
+            value={productQuery}
+            onChangeText={handleProductSearch}
+            style={styles.input}
+            placeholder="Digite o nome do produto"
+          />
+          <FlatList
+            data={productResults}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.productResultItem}
+                onPress={() => {
+                  setSelectedProduct(item);
+                  setProductQuery('');
+                  setProductResults([]);
+                }}
+              >
+                <Text>{item.name}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </>
+      )}
 
       <Text style={styles.label}>Data de Início (DD-MM-YYYY)</Text>
       <TextInputMask
@@ -334,5 +404,23 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  productResultItem: {
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  selectedProduct: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef08a',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  selectedProductText: {
+    flex: 1,
+    fontWeight: 'bold',
+    color: COLORS.text,
   },
 });

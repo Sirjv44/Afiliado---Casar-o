@@ -50,6 +50,7 @@ export default function EditProductsScreen() {
 
     const parsedPrice = parseFloat(String(product.price).replace(',', '.'));
     const parsedStock = parseInt(String(product.stock), 10);
+    const parsedCommission = parseFloat(String(product.commission_percentage).replace(',', '.'));
 
     const supabase = createClient();
     const { error } = await supabase
@@ -61,6 +62,7 @@ export default function EditProductsScreen() {
         description: product.description,
         category: product.category,
         image_url: product.image_url,
+        commission_percentage: parsedCommission,
       })
       .eq('id', product.id);
 
@@ -140,7 +142,7 @@ export default function EditProductsScreen() {
             <TextInput
               style={styles.input}
               value={String(product.price)}
-              keyboardType="default"
+              keyboardType="decimal-pad"
               onChangeText={(text) => handleChange(product.id, 'price', text)}
             />
 
@@ -174,6 +176,16 @@ export default function EditProductsScreen() {
               value={product.image_url || ''}
               onChangeText={(text) =>
                 handleChange(product.id, 'image_url', text)
+              }
+            />
+
+            <Text style={styles.label}>Comissão (%):</Text>
+            <TextInput
+              style={styles.input}
+              value={String(product.commission_percentage || '')}
+              keyboardType="decimal-pad"
+              onChangeText={(text) =>
+                handleChange(product.id, 'commission_percentage', text)
               }
             />
 

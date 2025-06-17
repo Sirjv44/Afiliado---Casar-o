@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,58 +13,35 @@ import { createClient } from '@/lib/supabase';
 
 const supabase = createClient();
 
-interface Order {
-  id: string;
-  clientName: string;
-  date: string;
-  totalAmount: number;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'canceled';
-  items: number;
-  affiliateName?: string;
-}
+const statusFilters = ['shipped', 'delivered'];
 
 const statusLabels = {
-  pending: 'Pendente',
-  processing: 'Em processamento',
   shipped: 'Enviado',
   delivered: 'Entregue',
-  canceled: 'Cancelado',
 } as const;
 
 const statusColors = {
-  pending: COLORS.warning,
-  processing: COLORS.info,
   shipped: COLORS.info,
   delivered: COLORS.success,
-  canceled: COLORS.error,
 } as const;
 
 export default function OrdersScreen() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<'shipped' | 'delivered'>('shipped');
 
   const loadOrders = async () => {
     try {
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-
-      if (sessionError || !sessionData.session) {
-        console.error('Usuário não autenticado:', sessionError?.message);
-        return;
-      }
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) return;
 
       const userId = sessionData.session.user.id;
 
-      const { data: profileData, error: profileError } = await supabase
+      const { data: profileData } = await supabase
         .from('profiles')
         .select('admin')
         .eq('id', userId)
         .single();
-
-      if (profileError) {
-        console.error('Erro ao buscar perfil:', profileError.message);
-        return;
-      }
 
       const isAdminUser = profileData?.admin === true;
       setIsAdmin(isAdminUser);
@@ -80,70 +57,80 @@ export default function OrdersScreen() {
           affiliate_id,
           profiles (full_name)
         `)
+        .eq('status', activeFilter)
         .order('created_at', { ascending: false });
 
       if (!isAdminUser) {
         ordersQuery = ordersQuery.eq('affiliate_id', userId);
       }
 
-      const { data: ordersData, error: ordersError } = await ordersQuery;
-
-      if (ordersError) {
-        console.error('Erro ao buscar pedidos:', ordersError.message);
-        return;
-      }
+      const { data: ordersData } = await ordersQuery;
       if (!ordersData) return;
 
       const orderIds = ordersData.map((o) => o.id);
-      const { data: orderItemsData, error: itemsError } = await supabase
+      const { data: orderItemsData } = await supabase
         .from('order_items')
         .select('order_id, quantity')
         .in('order_id', orderIds);
 
-      if (itemsError) {
-        console.error('Erro ao buscar itens dos pedidos:', itemsError.message);
-        return;
-      }
-
-      const itemCounts: Record<string, number> = {};
+      const itemCounts = {};
       orderItemsData?.forEach((item) => {
         const orderId = item.order_id;
         itemCounts[orderId] = (itemCounts[orderId] ?? 0) + (item.quantity ?? 0);
       });
 
-      const transformed: Order[] = ordersData.map((order: any) => ({
+      const transformed = ordersData.map((order) => ({
         id: order.id,
         clientName: order.client_name ?? 'Cliente não informado',
         date: order.created_at
           ? new Date(order.created_at).toLocaleDateString('pt-BR')
           : '',
         totalAmount: typeof order.total_amount === 'number' ? order.total_amount : 0,
-        status: order.status ?? 'pending',
+        status: order.status,
         items: itemCounts[order.id] ?? 0,
         affiliateName: order.profiles?.full_name ?? '',
       }));
 
       setOrders(transformed);
     } catch (error) {
-      console.error('Erro inesperado ao carregar pedidos:', error);
+      console.error('Erro ao carregar pedidos:', error);
     }
   };
 
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       loadOrders();
-    }, [])
+    }, [activeFilter])
   );
 
-  const renderOrderItem = ({ item }: { item: Order }) => (
+  const renderFilterButtons = () => (
+    <View style={styles.filterContainer}>
+      {statusFilters.map((status) => (
+        <TouchableOpacity
+          key={status}
+          style={[
+            styles.filterButton,
+            activeFilter === status && styles.activeFilter,
+          ]}
+          onPress={() => setActiveFilter(status)}
+        >
+          <Text
+            style={[
+              styles.filterText,
+              activeFilter === status && styles.activeFilterText,
+            ]}
+          >
+            {statusLabels[status]}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
+  const renderOrderItem = ({ item }) => (
     <TouchableOpacity
       style={styles.orderCard}
-      onPress={() =>
-        router.push({
-          pathname: '/order/[order_id]',
-          params: { order_id: item.id },
-        })
-      }
+      onPress={() => router.push({ pathname: '/order/[order_id]', params: { order_id: item.id } })}
     >
       <View style={styles.orderHeader}>
         <View style={styles.orderIcon}>
@@ -164,14 +151,10 @@ export default function OrdersScreen() {
           <Text style={styles.detailLabel}>Data</Text>
           <Text style={styles.detailValue}>{item.date}</Text>
         </View>
-
         <View style={styles.detailItem}>
           <Text style={styles.detailLabel}>Total</Text>
-          <Text style={styles.detailValue}>
-            R$ {item.totalAmount.toFixed(2)}
-          </Text>
+          <Text style={styles.detailValue}>R$ {item.totalAmount.toFixed(2)}</Text>
         </View>
-
         <View style={styles.detailItem}>
           <Text style={styles.detailLabel}>Itens</Text>
           <Text style={styles.detailValue}>{item.items}</Text>
@@ -180,10 +163,7 @@ export default function OrdersScreen() {
 
       <View style={styles.orderFooter}>
         <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: statusColors[item.status] },
-          ]}
+          style={[styles.statusBadge, { backgroundColor: statusColors[item.status] }]}
         >
           <Text style={styles.statusText}>{statusLabels[item.status]}</Text>
         </View>
@@ -191,37 +171,20 @@ export default function OrdersScreen() {
     </TouchableOpacity>
   );
 
-  const NoOrders = () => (
-    <View style={styles.emptyContainer}>
-      <ShoppingBag size={60} color={COLORS.textSecondary} />
-      <Text style={styles.emptyTitle}>Nenhum pedido ainda</Text>
-      <Text style={styles.emptyText}>
-        Você ainda não realizou nenhum pedido. Comece a vender agora!
-      </Text>
-      <TouchableOpacity
-        style={styles.newOrderButton}
-        onPress={() => router.push('/order/new')}
-      >
-        <Text style={styles.newOrderButtonText}>Criar Novo Pedido</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
   return (
     <View style={styles.container}>
+      {renderFilterButtons()}
       <FlatList
         data={orders}
         renderItem={renderOrderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={NoOrders}
       />
-
       <TouchableOpacity
         style={styles.fabButton}
         onPress={() => router.push('/order/new')}
       >
-        <Plus size={24} color="#FFFFFF" />
+        <Plus size={24} color="#FFF" />
       </TouchableOpacity>
     </View>
   );
@@ -236,36 +199,28 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 80,
   },
-  emptyContainer: {
-    flex: 1,
+  filterContainer: {
+    flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingTop: 100,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginTop: 20,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginTop: 10,
-    marginBottom: 30,
-  },
-  newOrderButton: {
-    backgroundColor: COLORS.primary,
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
   },
-  newOrderButtonText: {
+  filterButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    marginHorizontal: 6,
+  },
+  activeFilter: {
+    backgroundColor: COLORS.primary,
+  },
+  filterText: {
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  activeFilterText: {
     color: COLORS.text,
-    fontSize: 16,
-    fontWeight: '600',
   },
   orderCard: {
     backgroundColor: COLORS.card,
