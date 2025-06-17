@@ -82,7 +82,7 @@ export default function LoginScreen() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'https://xn--afiliadocasaro-2hb.com/reset-password',
+        redirectTo: 'https://xn--afiliadocasaro-2hb.com/reset-password?type=recovery',
       });
 
       if (error) {

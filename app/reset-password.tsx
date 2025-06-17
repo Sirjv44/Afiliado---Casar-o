@@ -8,7 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter, useGlobalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { createClient } from '@/lib/supabase';
 import { COLORS } from '@/constants/Colors';
 
@@ -17,19 +17,20 @@ const supabase = createClient();
 export default function ResetPasswordScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
   const router = useRouter();
-  const params = useGlobalSearchParams();
 
   useEffect(() => {
-    const hash = window?.location?.hash;
-    if (hash && hash.includes('type=recovery')) {
-      const query = new URLSearchParams(hash.replace('#', ''));
-      const access_token = query.get('access_token');
-
-      if (access_token) {
-        supabase.auth.setSession({ access_token, refresh_token: '' });
+    const checkSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (!data?.session) {
+        Alert.alert('Erro', 'Sessão inválida. Por favor, tente o link novamente.');
+        router.replace('/');
+      } else {
+        setSessionChecked(true);
       }
-    }
+    };
+    checkSession();
   }, []);
 
   const handleSubmit = async () => {
@@ -46,7 +47,7 @@ export default function ResetPasswordScreen() {
         Alert.alert('Erro', 'Não foi possível redefinir a senha.');
       } else {
         Alert.alert('Sucesso', 'Senha redefinida com sucesso!');
-        router.replace('/');
+        router.replace('/(tabs)/login');
       }
     } catch (e) {
       Alert.alert('Erro', 'Falha ao redefinir senha.');
@@ -54,6 +55,14 @@ export default function ResetPasswordScreen() {
       setLoading(false);
     }
   };
+
+  if (!sessionChecked) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
