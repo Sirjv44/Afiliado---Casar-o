@@ -32,12 +32,19 @@ export default function CatalogScreen() {
 
         if (error) {
           console.error('Erro ao buscar produtos:', error.message);
-        } else {
+        } else if (data) {
           setProducts(data);
 
+          // 🔥 Melhoria para eliminar categorias duplicadas (considerando espaços e letras maiúsculas)
           const uniqueCategories = [
             'Todos',
-            ...Array.from(new Set(data.map((p) => p.category).filter(Boolean))),
+            ...Array.from(
+              new Set(
+                data
+                  .map((p) => (p.category ? p.category.trim().toLowerCase() : ''))
+                  .filter((c) => c !== '')
+              )
+            ).map((c) => c.charAt(0).toUpperCase() + c.slice(1))
           ];
           setCategories(uniqueCategories);
         }
@@ -56,7 +63,8 @@ export default function CatalogScreen() {
       const name = product.name ?? '';
       const description = product.description ?? '';
       const matchesCategory =
-        selectedCategory === 'Todos' || product.category === selectedCategory;
+        selectedCategory === 'Todos' ||
+        product.category?.trim().toLowerCase() === selectedCategory.toLowerCase();
       const matchesSearch =
         name.toLowerCase().includes(searchText.toLowerCase()) ||
         description.toLowerCase().includes(searchText.toLowerCase());
@@ -65,7 +73,6 @@ export default function CatalogScreen() {
   }, [products, selectedCategory, searchText]);
 
   const handleAddToCart = (product: Product) => {
-    // Agora envia apenas o ID do produto
     router.push({
       pathname: '/order/new',
       params: { id: product.id },

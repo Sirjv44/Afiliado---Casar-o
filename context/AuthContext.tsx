@@ -6,9 +6,7 @@ import React, {
   ReactNode,
 } from 'react';
 import { createClient } from '@/lib/supabase';
-import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
-import { Platform } from 'react-native';
 
 interface User {
   id: string;
@@ -43,29 +41,6 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const storage = {
-  setItem: async (key: string, value: string) => {
-    if (Platform.OS === 'web') {
-      localStorage.setItem(key, value);
-    } else {
-      await SecureStore.setItemAsync(key, value);
-    }
-  },
-  getItem: async (key: string) => {
-    if (Platform.OS === 'web') {
-      return localStorage.getItem(key);
-    }
-    return await SecureStore.getItemAsync(key);
-  },
-  removeItem: async (key: string) => {
-    if (Platform.OS === 'web') {
-      localStorage.removeItem(key);
-    } else {
-      await SecureStore.deleteItemAsync(key);
-    }
-  },
-};
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -78,20 +53,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const loadSession = async () => {
       try {
-        const sessionStr = await storage.getItem('session');
-        const userStr = await storage.getItem('user');
+        const { data: { session } } = await supabase.auth.getSession();
 
-        if (sessionStr && userStr) {
-          const session = JSON.parse(sessionStr);
-          const user = JSON.parse(userStr);
+        if (session) {
+          const userId = session.user.id;
 
-          console.log('Usuário restaurado:', user); // ← log de depuração
+          const { data: userData, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .maybeSingle();
 
-          setState({
-            session,
-            user,
-            isLoading: false,
-          });
+          if (userData) {
+            const user: User = {
+              id: userData.id,
+              email: userData.email,
+              fullName: userData.full_name,
+              phone: userData.phone,
+              cpf: userData.cpf,
+              address: userData.address,
+              pixKey: userData.pix_key,
+              admin: userData.admin ?? false,
+            };
+
+            setState({
+              user,
+              session,
+              isLoading: false,
+            });
+          } else {
+            console.error('Erro ao buscar perfil:', error);
+            setState((prev) => ({ ...prev, isLoading: false }));
+          }
         } else {
           setState((prev) => ({ ...prev, isLoading: false }));
         }
@@ -135,13 +128,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         admin: userData.admin ?? false,
       };
 
-      await storage.setItem('session', JSON.stringify(data.session));
-      await storage.setItem('user', JSON.stringify(user));
-      await storage.setItem('userToken', data.session?.access_token || '');
-
       setState({
-        session: data.session,
         user,
+        session: data.session,
         isLoading: false,
       });
 
@@ -195,15 +184,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
-      await Promise.all([
-        storage.removeItem('session'),
-        storage.removeItem('user'),
-        storage.removeItem('userToken'),
-      ]);
-
       setState({
-        session: null,
         user: null,
+        session: null,
         isLoading: false,
       });
 
