@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { createClient } from '@/lib/supabase';
 import { router } from 'expo-router';
@@ -49,6 +50,54 @@ export default function ListagemOfertas() {
     });
   };
 
+  const handleDelete = async (offerId: string) => {
+    Alert.alert(
+      'Confirmar exclusão',
+      'Tem certeza que deseja excluir esta oferta?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+
+              const { error: imageError } = await supabase
+                .from('weekly_offer_images')
+                .delete()
+                .eq('offer_id', offerId);
+
+              if (imageError) {
+                console.error('Erro ao excluir imagens:', imageError);
+                Alert.alert('Erro', 'Erro ao excluir imagens da oferta.');
+                return;
+              }
+
+              const { error: offerError } = await supabase
+                .from('weekly_offers')
+                .delete()
+                .eq('id', offerId);
+
+              if (offerError) {
+                console.error('Erro ao excluir oferta:', offerError);
+                Alert.alert('Erro', 'Erro ao excluir a oferta.');
+                return;
+              }
+
+              await fetchOffers(); // Atualiza lista
+            } catch (err) {
+              console.error('Erro geral:', err);
+              Alert.alert('Erro inesperado', 'Não foi possível excluir a oferta.');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleNewOffer = () => {
     router.push('/admin/OfertasSemana');
   };
@@ -63,9 +112,18 @@ export default function ListagemOfertas() {
         </Text>
       </View>
 
-      <TouchableOpacity style={styles.editButton} onPress={() => handleEdit(item)}>
-        <Text style={styles.editButtonText}>Editar</Text>
-      </TouchableOpacity>
+      <View style={styles.buttonGroup}>
+        <TouchableOpacity style={styles.editButton} onPress={() => handleEdit(item)}>
+          <Text style={styles.editButtonText}>Editar</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDelete(item.id)}
+        >
+          <Text style={styles.deleteButtonText}>Excluir</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -120,6 +178,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 10,
     backgroundColor: COLORS.card,
+    alignItems: 'center',
   },
   offerTitle: {
     color: COLORS.text,
@@ -130,14 +189,29 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 4,
   },
+  buttonGroup: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   editButton: {
     backgroundColor: COLORS.primary,
     borderRadius: 6,
     paddingVertical: 6,
     paddingHorizontal: 12,
-    justifyContent: 'center',
+    marginLeft: 10,
   },
   editButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  deleteButton: {
+    backgroundColor: '#dc2626',
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginLeft: 8,
+  },
+  deleteButtonText: {
     color: '#fff',
     fontWeight: 'bold',
   },

@@ -7,6 +7,7 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/Colors';
@@ -25,10 +26,11 @@ import {
 import { createClient } from '@/lib/supabase';
 
 export default function DashboardScreen() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [recentSales, setRecentSales] = useState([]);
+  const [ofertaSemana, setOfertaSemana] = useState(null);
   const [stats, setStats] = useState({
     totalSales: 0,
     totalOrders: 0,
@@ -43,26 +45,6 @@ export default function DashboardScreen() {
     } catch (error) {
       console.error('Logout error:', error);
     }
-  };
-
-  const handlePromoClick = async (productId: string) => {
-    const supabase = createClient();
-
-    const { data: product, error } = await supabase
-      .from('products')
-      .select('id')
-      .eq('id', productId)
-      .single();
-
-    if (error || !product) {
-      console.error('Erro ao buscar produto da promoção:', error);
-      return;
-    }
-
-    router.push({
-      pathname: '/order/new',
-      params: { id: product.id },
-    });
   };
 
   useEffect(() => {
@@ -107,8 +89,7 @@ export default function DashboardScreen() {
 
         const { data: sales } = await supabase
           .from('order_items')
-          .select(
-            `
+          .select(`
             id,
             created_at,
             product:products(name),
@@ -116,47 +97,67 @@ export default function DashboardScreen() {
               affiliate_id,
               profiles(full_name)
             )
-          `
-          )
+          `)
           .order('created_at', { ascending: false })
           .limit(5);
 
         setRecentSales(sales || []);
+
+        const today = new Date().toISOString().split('T')[0];
+
+        const { data: offer } = await supabase
+          .from('weekly_offers')
+          .select('*')
+          .lte('start_date', today)
+          .gte('end_date', today)
+          .order('start_date', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (offer) {
+          const { data: imagesData } = await supabase
+            .from('weekly_offer_images')
+            .select('image_url')
+            .eq('offer_id', offer.id)
+            .order('display_order', { ascending: true });
+
+          setOfertaSemana({
+            id: offer.id,
+            title: offer.title,
+            description: offer.description,
+            images: imagesData?.map((img) => img.image_url) || [],
+          });
+        }
       } catch (error) {
         console.error('Erro ao buscar dados do dashboard:', error);
       }
     };
 
-    fetchDashboardData();
-  }, [router, user]);
+    if (user && !authLoading) {
+      fetchDashboardData();
+    }
+  }, [router, user, authLoading]);
 
-  const promoProducts = [
-    {
-      id: 'f880483a-1b7c-47b1-8f22-740f361a0828',
-      image: require('@/assets/images/ataque1.jpeg'),
-    },
-    {
-      id: 'f880483a-1b7c-47b1-8f22-740f361a0828',
-      image: require('@/assets/images/ataque2.jpeg'),
-    },
-    {
-      id: 'f880483a-1b7c-47b1-8f22-740f361a0828',
-      image: require('@/assets/images/ataque3.jpeg'),
-    },
-  ];
+  if (authLoading || !user) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Image
           source={{
-            uri: 'https://images.pexels.com/photos/1547248/pexels-photo-1547248.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
+            uri: 'https://images.pexels.com/photos/1547248/pexels-photo-1547248.jpeg',
           }}
           style={styles.headerBackground}
         />
         <View style={styles.headerContent}>
           <Text style={styles.welcomeText}>Bem-vindo(a),</Text>
-          <Text style={styles.nameText}>{user?.fullName || 'Afiliado'}</Text>
+          <Text style={styles.nameText}>{user.fullName || 'Afiliado'}</Text>
         </View>
       </View>
 
@@ -184,105 +185,35 @@ export default function DashboardScreen() {
           />
         </View>
 
-        <Text style={styles.sectionTitle}>Ações Rápidas</Text>
+        <Text style={styles.sectionTitle}>Promoção da Semana!</Text>
 
-        <View style={styles.actionsContainer}>
-          <ActionButton
-            title="Fazer Novo Pedido"
-            onPress={() => router.push('/order/new')}
-            icon={<ShoppingBag size={20} color="#FFFFFF" />}
-          />
-          <ActionButton
-            title="Ver Catálogo"
-            onPress={() => router.push('/(tabs)/catalog')}
-            icon={<Database size={20} color="#FFFFFF" />}
-          />
-          <ActionButton
-            title="Favoritos"
-            onPress={() => router.push('/Favoritos')}
-            icon={<Bookmark size={20} color="#FFFFFF" />}
-          />
-          <ActionButton
-            title="Minhas Comissões"
-            onPress={() => router.push('/(tabs)/commissions')}
-            icon={<CreditCard size={20} color="#FFFFFF" />}
-          />
-          <ActionButton
-            title="Sair da Conta"
-            onPress={handleLogout}
-            loading={isLoading}
-            primary={false}
-            icon={<LogOut size={20} color={COLORS.primary} />}
-          />
-        </View>
+        {ofertaSemana ? (
+          <View style={styles.promotionContainer}>
+            <Text style={styles.promotionTitle}>{ofertaSemana.title}</Text>
+            <Text style={styles.promotionText}>{ofertaSemana.description}</Text>
 
-        {user?.admin && (
-          <>
-            <Text style={styles.sectionTitle}>Administração</Text>
-            <View style={styles.actionsContainer}>
-              <ActionButton
-                title="Lista de Afiliados"
-                onPress={() => router.push('/admin/Afiliados')}
-                icon={<Users size={20} color="#FFFFFF" />}
-              />
-              <ActionButton
-                title="Alterar Produtos"
-                onPress={() => router.push('/admin/AlterarProdutos')}
-                icon={<Settings size={20} color="#FFFFFF" />}
-              />
-              <ActionButton
-                title="Alterar Pedidos"
-                onPress={() => router.push('/admin/AlterarPedidos')}
-                icon={<Settings size={20} color="#FFFFFF" />}
-              />
-              <ActionButton
-                title="Alterar Cadastros"
-                onPress={() => router.push('/admin/Usuarios')}
-                icon={<Users size={20} color="#FFFFFF" />}
-              />
-              <ActionButton
-                title="Ofertas da Semana"
-                onPress={() => router.push('/admin/ListagemOfertas')}
-                icon={<Bookmark size={20} color="#FFFFFF" />}
-              />
-            </View>
-          </>
-        )}
-
-        <View style={styles.promotionContainer}>
-          <Text style={styles.promotionTitle}>Promoção da Semana!</Text>
-          <Text style={styles.promotionText}>
-            Combo Viper de R$ 349,00 por 249,90
-          </Text>
-
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            style={styles.carousel}
-          >
-            {promoProducts.map((item, idx) => (
-              <TouchableOpacity key={idx} onPress={() => handlePromoClick(item.id)}>
-                <Image
-                  source={item.image}
-                  style={styles.carouselImage}
-                  resizeMode="cover"
-                />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {recentSales.length > 0 && (
-          <View style={styles.salesFeed}>
-            <Text style={styles.sectionTitle}>Últimas Vendas</Text>
-            {recentSales.map((sale, index) => (
-              <Text key={index} style={styles.saleText}>
-                {sale.order?.profiles?.full_name} acabou de vender{' '}
-                {sale.product?.name}
-              </Text>
-            ))}
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              style={styles.carousel}
+            >
+              {ofertaSemana.images.map((url, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  onPress={() => router.push('/order/new')}
+                >
+                  <Image
+                    source={{ uri: url }}
+                    style={styles.carouselImage}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
+        ) : (
+          <ActivityIndicator size="small" color={COLORS.textSecondary} />
         )}
       </View>
     </ScrollView>
@@ -332,9 +263,6 @@ const styles = StyleSheet.create({
   statsContainer: {
     marginBottom: 20,
   },
-  actionsContainer: {
-    marginBottom: 20,
-  },
   promotionContainer: {
     backgroundColor: COLORS.secondaryLight,
     borderRadius: 12,
@@ -365,16 +293,5 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 12,
     marginRight: 10,
-  },
-  salesFeed: {
-    backgroundColor: COLORS.cardAlt,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-  },
-  saleText: {
-    fontSize: 14,
-    color: COLORS.text,
-    marginBottom: 6,
   },
 });

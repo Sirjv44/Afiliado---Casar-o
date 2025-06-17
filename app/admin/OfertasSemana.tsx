@@ -14,7 +14,13 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { parse, isValid } from 'date-fns';
 
 export default function NovaOferta() {
-  const { offerId, title: paramTitle, description: paramDescription, startDate: paramStart, endDate: paramEnd } = useLocalSearchParams();
+  const {
+    id,
+    title: paramTitle,
+    description: paramDescription,
+    startDate: paramStart,
+    endDate: paramEnd,
+  } = useLocalSearchParams();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -26,25 +32,27 @@ export default function NovaOferta() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (offerId) {
+    if (id) {
       setTitle(paramTitle as string);
       setDescription(paramDescription as string);
       setStartDate(paramStart as string);
       setEndDate(paramEnd as string);
-      loadImages(Number(offerId));
+      loadImages(id as string); // ✅ CORREÇÃO AQUI
     }
-  }, [offerId]);
+  }, [id]);
 
-  const loadImages = async (id: number) => {
+  const loadImages = async (offerId: string) => {
     const supabase = createClient();
     const { data, error } = await supabase
       .from('weekly_offer_images')
       .select('image_url')
-      .eq('offer_id', id)
+      .eq('offer_id', offerId)
       .order('display_order', { ascending: true });
 
     if (!error && data) {
       setImageUrls(data.map((item) => item.image_url));
+    } else {
+      console.error('Erro ao carregar imagens:', error);
     }
   };
 
@@ -55,7 +63,7 @@ export default function NovaOferta() {
 
   const handleAddImage = () => {
     if (imageUrl.trim() !== '') {
-      setImageUrls([...imageUrls, imageUrl]);
+      setImageUrls([...imageUrls, imageUrl.trim()]);
       setImageUrl('');
     }
   };
@@ -80,9 +88,9 @@ export default function NovaOferta() {
     try {
       setLoading(true);
       const supabase = createClient();
-      let offerIdToUse = offerId;
+      let offerIdToUse = id;
 
-      if (offerId) {
+      if (id) {
         const { error: updateError } = await supabase
           .from('weekly_offers')
           .update({
@@ -91,7 +99,7 @@ export default function NovaOferta() {
             start_date: formattedStart,
             end_date: formattedEnd,
           })
-          .eq('id', offerId);
+          .eq('id', id);
 
         if (updateError) {
           console.error('Erro ao atualizar oferta:', updateError);
@@ -99,7 +107,7 @@ export default function NovaOferta() {
           return;
         }
 
-        await supabase.from('weekly_offer_images').delete().eq('offer_id', offerId);
+        await supabase.from('weekly_offer_images').delete().eq('offer_id', id);
       } else {
         const { data: offer, error: offerError } = await supabase
           .from('weekly_offers')
@@ -209,7 +217,18 @@ export default function NovaOferta() {
         data={imageUrls}
         keyExtractor={(item, index) => index.toString()}
         renderItem={({ item, index }) => (
-          <Text style={styles.imageItem}>{index + 1}. {item}</Text>
+          <View style={styles.imageItemContainer}>
+            <Text style={styles.imageItem}>{index + 1}. {item}</Text>
+            <TouchableOpacity
+              onPress={() => {
+                const updated = imageUrls.filter((_, i) => i !== index);
+                setImageUrls(updated);
+              }}
+              style={styles.removeButton}
+            >
+              <Text style={styles.removeButtonText}>❌</Text>
+            </TouchableOpacity>
+          </View>
         )}
       />
 
@@ -219,7 +238,7 @@ export default function NovaOferta() {
         disabled={loading}
       >
         <Text style={styles.saveButtonText}>
-          {loading ? 'Salvando...' : offerId ? 'Atualizar Oferta' : 'Salvar Oferta'}
+          {loading ? 'Salvando...' : id ? 'Atualizar Oferta' : 'Salvar Oferta'}
         </Text>
       </TouchableOpacity>
     </View>
@@ -280,9 +299,29 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: 'bold',
   },
+  imageItemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f5f5f5',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 8,
+  },
   imageItem: {
     color: COLORS.textSecondary,
-    marginTop: 5,
+    flex: 1,
+    marginRight: 10,
+  },
+  removeButton: {
+    backgroundColor: '#dc2626',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  removeButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
   },
   saveButton: {
     backgroundColor: COLORS.success,
