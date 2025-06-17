@@ -1,13 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { createClient } from '@/lib/supabase';
 import { COLORS } from '@/constants/Colors';
@@ -21,16 +13,38 @@ export default function ResetPasswordScreen() {
   const router = useRouter();
 
   useEffect(() => {
-    const checkSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (!data?.session) {
-        Alert.alert('Erro', 'Sessão inválida. Por favor, tente o link novamente.');
-        router.replace('/');
-      } else {
+    const trySetSessionFromHash = async () => {
+      const hash = window?.location?.hash;
+      if (hash && hash.includes('access_token')) {
+        const query = new URLSearchParams(hash.replace('#', ''));
+        const access_token = query.get('access_token');
+        const refresh_token = query.get('refresh_token');
+
+        if (access_token) {
+          const { error } = await supabase.auth.setSession({
+            access_token,
+            refresh_token: refresh_token || '',
+          });
+
+          if (error) {
+            Alert.alert('Erro', 'Falha ao restaurar sessão. Tente o link novamente.');
+            router.replace('/');
+            return;
+          }
+        }
+      }
+
+      // Agora verifica se tem sessão ativa
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
         setSessionChecked(true);
+      } else {
+        Alert.alert('Erro', 'Sessão não encontrada.');
+        router.replace('/');
       }
     };
-    checkSession();
+
+    trySetSessionFromHash();
   }, []);
 
   const handleSubmit = async () => {
@@ -47,7 +61,7 @@ export default function ResetPasswordScreen() {
         Alert.alert('Erro', 'Não foi possível redefinir a senha.');
       } else {
         Alert.alert('Sucesso', 'Senha redefinida com sucesso!');
-        router.replace('/(tabs)/login');
+        router.replace('/');
       }
     } catch (e) {
       Alert.alert('Erro', 'Falha ao redefinir senha.');
