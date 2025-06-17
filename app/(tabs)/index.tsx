@@ -240,6 +240,11 @@ export default function DashboardScreen() {
                 onPress={() => router.push('/admin/Usuarios')}
                 icon={<Users size={20} color="#FFFFFF" />}
               />
+              <ActionButton
+                title="Ofertas da Semana"
+                onPress={() => router.push('/admin/ListagemOfertas')}
+                icon={<Bookmark size={20} color="#FFFFFF" />}
+              />
             </View>
           </>
         )}

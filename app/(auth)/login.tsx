@@ -10,15 +10,20 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { COLORS } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
 import { Lock, Mail } from 'lucide-react-native';
+import bcrypt from 'bcryptjs';
+import { createClient } from '@/lib/supabase';
+
+const supabase = createClient();
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showRecoveryMessage, setShowRecoveryMessage] = useState(false);
   const { signIn } = useAuth();
 
   const handleLogin = async () => {
@@ -29,15 +34,66 @@ export default function LoginScreen() {
 
     try {
       setIsLoading(true);
-      await signIn(email, password);
+
+      const { error } = await signIn(email, password);
+
+      if (!error) {
+        return;
+      }
+
+      console.log('Login pelo Auth falhou, tentando login via profiles...');
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+      if (profileError || !profile) {
+        Alert.alert('Erro de login', 'Email ou senha incorretos.');
+        return;
+      }
+
+      const senhaCorreta = await bcrypt.compare(password, profile.password);
+
+      if (!senhaCorreta) {
+        Alert.alert('Erro de login', 'Email ou senha incorretos.');
+        return;
+      }
+
+      Alert.alert('Sucesso', 'Login realizado com sucesso!');
+      router.replace('/(tabs)/index');
+
     } catch (error) {
       console.error(error);
-      Alert.alert(
-        'Erro de login',
-        'Email ou senha incorretos. Tente novamente.'
-      );
+      Alert.alert('Erro inesperado', 'Ocorreu um erro. Tente novamente mais tarde.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setShowRecoveryMessage(true);
+      return;
+    }
+
+    setShowRecoveryMessage(false);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'https://xn--afiliadocasaro-2hb.com/reset-password',
+      });
+
+      if (error) {
+        console.error(error);
+        Alert.alert('Erro', 'Não foi possível enviar o link de recuperação.');
+      } else {
+        Alert.alert('Sucesso', 'Verifique seu e-mail para redefinir sua senha.');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Erro', 'Ocorreu um erro ao tentar recuperar a senha.');
     }
   };
 
@@ -105,6 +161,19 @@ export default function LoginScreen() {
                 <Text style={styles.footerLink}>Cadastre-se</Text>
               </TouchableOpacity>
             </Link>
+          </View>
+
+          <View style={{ marginTop: 16, alignItems: 'center' }}>
+            <TouchableOpacity onPress={handleForgotPassword}>
+              <Text style={[styles.footerLink, { textDecorationLine: 'underline' }]}>
+                Esqueci minha senha
+              </Text>
+            </TouchableOpacity>
+            {showRecoveryMessage && (
+              <Text style={{ color: 'red', marginTop: 8, textAlign: 'center' }}>
+                Digite seu e-mail acima para receber o link de redefinição.
+              </Text>
+            )}
           </View>
         </View>
       </View>
