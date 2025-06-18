@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  ToastAndroid,
+  Platform,
   Alert,
 } from 'react-native';
 import { createClient } from '@/lib/supabase';
@@ -27,6 +29,7 @@ export default function ListagemOfertas() {
 
     if (error) {
       console.error('Erro ao buscar ofertas:', error);
+      Alert.alert('Erro', 'Não foi possível carregar as ofertas.');
     } else {
       setOffers(data || []);
     }
@@ -51,51 +54,48 @@ export default function ListagemOfertas() {
   };
 
   const handleDelete = async (offerId: string) => {
-    Alert.alert(
-      'Confirmar exclusão',
-      'Tem certeza que deseja excluir esta oferta?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setLoading(true);
+    setLoading(true);
+    try {
+      // Excluir imagens
+      const { error: imageError } = await supabase
+        .from('weekly_offer_images')
+        .delete()
+        .eq('offer_id', offerId);
 
-              const { error: imageError } = await supabase
-                .from('weekly_offer_images')
-                .delete()
-                .eq('offer_id', offerId);
+      if (imageError) {
+        console.error('Erro ao excluir imagens:', imageError);
+        Alert.alert('Erro', 'Erro ao excluir as imagens da oferta.');
+        setLoading(false);
+        return;
+      }
 
-              if (imageError) {
-                console.error('Erro ao excluir imagens:', imageError);
-                Alert.alert('Erro', 'Erro ao excluir imagens da oferta.');
-                return;
-              }
+      // Excluir a oferta principal
+      const { error: offerError } = await supabase
+        .from('weekly_offers')
+        .delete()
+        .eq('id', offerId);
 
-              const { error: offerError } = await supabase
-                .from('weekly_offers')
-                .delete()
-                .eq('id', offerId);
+      if (offerError) {
+        console.error('Erro ao excluir oferta:', offerError);
+        Alert.alert('Erro', 'Erro ao excluir a oferta.');
+        setLoading(false);
+        return;
+      }
 
-              if (offerError) {
-                console.error('Erro ao excluir oferta:', offerError);
-                Alert.alert('Erro', 'Erro ao excluir a oferta.');
-                return;
-              }
+      // Sucesso
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Oferta excluída com sucesso!', ToastAndroid.SHORT);
+      } else {
+        Alert.alert('Sucesso', 'Oferta excluída com sucesso!');
+      }
 
-              await fetchOffers(); // Atualiza lista
-            } catch (err) {
-              console.error('Erro geral:', err);
-              Alert.alert('Erro inesperado', 'Não foi possível excluir a oferta.');
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ]
-    );
+      await fetchOffers();
+    } catch (err) {
+      console.error('Erro inesperado:', err);
+      Alert.alert('Erro inesperado', 'Não foi possível excluir a oferta.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleNewOffer = () => {

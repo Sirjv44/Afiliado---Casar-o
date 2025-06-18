@@ -29,8 +29,7 @@ export default function DashboardScreen() {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [recentSales, setRecentSales] = useState([]);
-  const [ofertaSemana, setOfertaSemana] = useState(null);
+  const [ofertasSemana, setOfertasSemana] = useState([]);
   const [stats, setStats] = useState({
     totalSales: 0,
     totalOrders: 0,
@@ -57,6 +56,7 @@ export default function DashboardScreen() {
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
 
+        // Resumo financeiro
         const { data: orders } = await supabase
           .from('orders')
           .select('total_amount, created_at')
@@ -87,47 +87,37 @@ export default function DashboardScreen() {
           totalCommission,
         });
 
-        const { data: sales } = await supabase
-          .from('order_items')
-          .select(`
-            id,
-            created_at,
-            product:products(name),
-            order:orders!inner(
-              affiliate_id,
-              profiles(full_name)
-            )
-          `)
-          .order('created_at', { ascending: false })
-          .limit(5);
-
-        setRecentSales(sales || []);
-
+        // Buscar todas as promoções ativas
         const today = new Date().toISOString().split('T')[0];
 
-        const { data: offer } = await supabase
+        const { data: offers } = await supabase
           .from('weekly_offers')
           .select('*')
           .lte('start_date', today)
           .gte('end_date', today)
-          .order('start_date', { ascending: false })
-          .limit(1)
-          .single();
+          .order('start_date', { ascending: false });
 
-        if (offer) {
-          const { data: imagesData } = await supabase
-            .from('weekly_offer_images')
-            .select('image_url')
-            .eq('offer_id', offer.id)
-            .order('display_order', { ascending: true });
+        if (offers?.length) {
+          const ofertasComImagens = await Promise.all(
+            offers.map(async (offer) => {
+              const { data: imagesData } = await supabase
+                .from('weekly_offer_images')
+                .select('image_url')
+                .eq('offer_id', offer.id)
+                .order('display_order', { ascending: true });
 
-          setOfertaSemana({
-            id: offer.id,
-            title: offer.title,
-            description: offer.description,
-            product_id: offer.product_id,
-            images: imagesData?.map((img) => img.image_url) || [],
-          });
+              return {
+                id: offer.id,
+                title: offer.title,
+                description: offer.description,
+                product_id: offer.product_id,
+                images: imagesData?.map((img) => img.image_url) || [],
+              };
+            })
+          );
+          setOfertasSemana(ofertasComImagens);
+        } else {
+          setOfertasSemana([]);
         }
       } catch (error) {
         console.error('Erro ao buscar dados do dashboard:', error);
@@ -241,33 +231,40 @@ export default function DashboardScreen() {
           </>
         )}
 
-        <Text style={styles.sectionTitle}>Promoção da Semana!</Text>
+        <Text style={styles.sectionTitle}>Promoções da Semana!</Text>
 
-        {ofertaSemana ? (
-          <View style={styles.promotionContainer}>
-            <Text style={styles.promotionTitle}>{ofertaSemana.title}</Text>
-            <Text style={styles.promotionText}>{ofertaSemana.description}</Text>
+        {ofertasSemana.length > 0 ? (
+          ofertasSemana.map((oferta, index) => (
+            <View key={index} style={styles.promotionContainer}>
+              <Text style={styles.promotionTitle}>{oferta.title}</Text>
+              <Text style={styles.promotionText}>{oferta.description}</Text>
 
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              style={styles.carousel}
-            >
-              {ofertaSemana.images.map((url, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  onPress={() => router.push({ pathname: '/order/new', params: { id: ofertaSemana.product_id } })}
-                >
-                  <Image
-                    source={{ uri: url }}
-                    style={styles.carouselImage}
-                    resizeMode="cover"
-                  />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                style={styles.carousel}
+              >
+                {oferta.images.map((url, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/order/new',
+                        params: { id: oferta.product_id },
+                      })
+                    }
+                  >
+                    <Image
+                      source={{ uri: url }}
+                      style={styles.carouselImage}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          ))
         ) : (
           <ActivityIndicator size="small" color={COLORS.textSecondary} />
         )}

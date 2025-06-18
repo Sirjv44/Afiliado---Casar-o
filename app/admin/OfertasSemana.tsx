@@ -246,7 +246,7 @@ export default function NovaOferta() {
                   setProductResults([]);
                 }}
               >
-                <Text>{item.name}</Text>
+                <Text style={styles.productResultItemText}>{item.name}</Text>
               </TouchableOpacity>
             )}
           />
@@ -371,24 +371,30 @@ const styles = StyleSheet.create({
   },
   imageItemContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start', // alinha no topo
     justifyContent: 'space-between',
     backgroundColor: '#f5f5f5',
     padding: 10,
     borderRadius: 8,
     marginTop: 8,
+    flexWrap: 'wrap',          // permite quebrar se for pequeno
   },
   imageItem: {
     color: COLORS.textSecondary,
-    flex: 1,
+    flexShrink: 1,             // permite o texto encolher
     marginRight: 10,
+    flex: 1,                   // deixa o texto ocupar o máximo possível
+    minWidth: '70%',           // dá um tamanho mínimo pro texto
   },
   removeButton: {
     backgroundColor: '#dc2626',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    alignSelf: 'flex-start',    // garante que o botão fique no topo, mesmo que quebre a linha
+    marginTop: 4,
   },
+  
   removeButtonText: {
     color: '#FFF',
     fontWeight: 'bold',
@@ -409,11 +415,15 @@ const styles = StyleSheet.create({
     padding: 8,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.primary,
+  },
+  productResultItemText: {
+    color: '#FFF',
   },
   selectedProduct: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fef08a',
+    backgroundColor: '#2563eb', // azul médio
     padding: 8,
     borderRadius: 8,
     marginTop: 4,
@@ -421,6 +431,6 @@ const styles = StyleSheet.create({
   selectedProductText: {
     flex: 1,
     fontWeight: 'bold',
-    color: COLORS.text,
+    color: '#FFF',
   },
 });
