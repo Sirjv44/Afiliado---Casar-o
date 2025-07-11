@@ -601,7 +601,7 @@ export default function NewOrderScreen() {
         ? 0.4
         : 0.15;
 
-    const amount = item.price * item.quantity * commissionRate;
+    const amount = parseFloat((item.price * item.quantity * commissionRate).toFixed(2));
 
     return {
       order_id: orderId,
