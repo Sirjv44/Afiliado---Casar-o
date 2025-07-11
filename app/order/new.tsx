@@ -588,22 +588,31 @@ export default function NewOrderScreen() {
       const highCommissionKeywords = ['tribulus', 'maca peruana', 'provitalis', 'cindura', 'ioimbina', 'viper'];
 
 
-const commissionsToInsert = cartItems.map((item) => {
-  const name = item.name.toLowerCase();
-  const isHighCommission = highCommissionKeywords.some((keyword) =>
-    name.startsWith(keyword) || name.includes(keyword)
-  );
+  const commissionsToInsert = cartItems.map((item) => {
+    const name = item.name.toLowerCase();
+    const isHighCommission = highCommissionKeywords.some((keyword) =>
+      name.startsWith(keyword) || name.includes(keyword)
+    );
 
-  const commissionRate = isHighCommission ? 0.4 : 0.15;
-  const amount = item.price * item.quantity * commissionRate;
+    const hasCustomPercentage =
+      item.commission_percentage !== null &&
+      item.commission_percentage !== undefined;
 
-  return {
-    order_id: orderId,
-    affiliate_id: userId,
-    amount,
-    status: 'pending',
-  };
-});
+    const commissionRate = hasCustomPercentage
+      ? item.commission_percentage / 100
+      : isHighCommission
+      ? 0.4
+      : 0.15;
+
+    const amount = item.price * item.quantity * commissionRate;
+
+    return {
+      order_id: orderId,
+      affiliate_id: userId,
+      amount,
+      status: 'pending',
+    };
+  });
 
 
       const { error: commissionError } = await supabase
