@@ -594,12 +594,14 @@ export default function NewOrderScreen() {
     );
 
     // Se o produto tiver commission_percentage definido, usar ele. Caso contrário, usar regra padrão.
-    const hasCustomPercentage = item.commission_percentage !== null && item.commission_percentage !== undefined;
-    const commissionRate = hasCustomPercentage
-      ? item.commission_percentage // já está como fração (ex: 0.4)
+    const isValidPercentage = typeof item.commission_percentage === 'number' && !isNaN(item.commission_percentage);
+
+    const commissionRate = isValidPercentage
+      ? item.commission_percentage
       : isHighCommission
         ? 0.4
         : 0.15;
+
 
     const amount = parseFloat((item.price * item.quantity * commissionRate).toFixed(2));
 
