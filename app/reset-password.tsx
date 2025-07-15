@@ -13,39 +13,9 @@ export default function ResetPasswordScreen() {
   const router = useRouter();
 
   useEffect(() => {
-    const restoreSession = async () => {
-      // 1️⃣ Captura tanto ?query quanto #hash ─ cobre os dois formatos
-      const raw =
-        typeof window !== 'undefined'
-          ? window.location.search || window.location.hash
-          : '';
-
-      const params = new URLSearchParams(raw.replace(/^[?#]/, ''));
-      const access_token  = params.get('access_token');
-      const refresh_token = params.get('refresh_token') ?? '';
-
-      // 2️⃣ Exibe mensagem de link expirado/errado
-      if (params.get('error_code') === '403') {
-        Alert.alert('Link expirado', 'Solicite uma nova redefinição de senha.');
-        router.replace('/');
-        return;
-      }
-
-      // 3️⃣ Se tiver token, cria sessão; senão cai fora
-      if (access_token) {
-        const { error } = await supabase.auth.setSession({
-          access_token,
-          refresh_token,
-        });
-        if (error) {
-          Alert.alert('Erro', 'Falha ao restaurar sessão. Tente o link novamente.');
-          router.replace('/');
-          return;
-        }
-      }
-
-      // 4️⃣ Confirma que a sessão existe
+    const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
+
       if (data.session) {
         setSessionChecked(true);
       } else {
@@ -54,8 +24,9 @@ export default function ResetPasswordScreen() {
       }
     };
 
-    restoreSession();
+    checkSession();
   }, []);
+
 
   const handleSubmit = async () => {
     if (newPassword.length < 6) {
