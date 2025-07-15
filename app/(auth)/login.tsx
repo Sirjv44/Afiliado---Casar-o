@@ -82,7 +82,7 @@ export default function LoginScreen() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'https://elegant-youtiao-e8a339.netlify.app/reset-password',
+        redirectTo: 'https://xn--afiliadocasaro-2hb.com/reset-password?recovery=1',
       });      
 
       if (error) {

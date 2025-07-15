@@ -13,9 +13,29 @@ export default function ResetPasswordScreen() {
   const router = useRouter();
 
   useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
+    const trySetSessionFromHash = async () => {
+      const hash = window?.location?.hash;
+      if (hash && hash.includes('access_token')) {
+        const query = new URLSearchParams(hash.replace('#', ''));
+        const access_token = query.get('access_token');
+        const refresh_token = query.get('refresh_token');
 
+        if (access_token) {
+          const { error } = await supabase.auth.setSession({
+            access_token,
+            refresh_token: refresh_token || '',
+          });
+
+          if (error) {
+            Alert.alert('Erro', 'Falha ao restaurar sessão. Tente o link novamente.');
+            router.replace('/');
+            return;
+          }
+        }
+      }
+
+      // Agora verifica se tem sessão ativa
+      const { data } = await supabase.auth.getSession();
       if (data.session) {
         setSessionChecked(true);
       } else {
@@ -24,9 +44,8 @@ export default function ResetPasswordScreen() {
       }
     };
 
-    checkSession();
+    trySetSessionFromHash();
   }, []);
-
 
   const handleSubmit = async () => {
     if (newPassword.length < 6) {
