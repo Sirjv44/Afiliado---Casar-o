@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  Platform,
+} from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { createClient } from '@/lib/supabase';
 import { COLORS } from '@/constants/Colors';
 
@@ -10,31 +19,36 @@ export default function ResetPasswordScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
+
   const router = useRouter();
+  const params = useLocalSearchParams();
 
   useEffect(() => {
-    const trySetSessionFromHash = async () => {
-      const hash = window?.location?.hash;
-      if (hash && hash.includes('access_token')) {
+    const trySetSession = async () => {
+      let access_token = params.access_token as string;
+      let refresh_token = params.refresh_token as string;
+
+      // Se estiver na Web e os tokens vierem na hash
+      if (Platform.OS === 'web' && !access_token) {
+        const hash = window.location.hash;
         const query = new URLSearchParams(hash.replace('#', ''));
-        const access_token = query.get('access_token');
-        const refresh_token = query.get('refresh_token');
+        access_token = query.get('access_token') || '';
+        refresh_token = query.get('refresh_token') || '';
+      }
 
-        if (access_token) {
-          const { error } = await supabase.auth.setSession({
-            access_token,
-            refresh_token: refresh_token || '',
-          });
+      if (access_token) {
+        const { error } = await supabase.auth.setSession({
+          access_token,
+          refresh_token: refresh_token || '',
+        });
 
-          if (error) {
-            Alert.alert('Erro', 'Falha ao restaurar sessão. Tente o link novamente.');
-            router.replace('/');
-            return;
-          }
+        if (error) {
+          Alert.alert('Erro', 'Falha ao restaurar sessão. Tente o link novamente.');
+          router.replace('/');
+          return;
         }
       }
 
-      // Agora verifica se tem sessão ativa
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         setSessionChecked(true);
@@ -44,7 +58,7 @@ export default function ResetPasswordScreen() {
       }
     };
 
-    trySetSessionFromHash();
+    trySetSession();
   }, []);
 
   const handleSubmit = async () => {
@@ -72,7 +86,7 @@ export default function ResetPasswordScreen() {
 
   if (!sessionChecked) {
     return (
-      <View style={styles.container}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
@@ -81,14 +95,21 @@ export default function ResetPasswordScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Redefinir Senha</Text>
+
       <TextInput
         style={styles.input}
         placeholder="Nova senha"
+        placeholderTextColor={COLORS.textSecondary}
         secureTextEntry
         value={newPassword}
         onChangeText={setNewPassword}
       />
-      <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
+
+      <TouchableOpacity
+        style={styles.button}
+        onPress={handleSubmit}
+        disabled={loading}
+      >
         {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
@@ -100,6 +121,12 @@ export default function ResetPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
