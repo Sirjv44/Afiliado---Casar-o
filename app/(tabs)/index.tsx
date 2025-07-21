@@ -22,6 +22,8 @@ import {
   Users,
   Settings,
   Bookmark,
+  BarChart,
+  FileText,
 } from 'lucide-react-native';
 import { createClient } from '@/lib/supabase';
 
@@ -165,10 +167,25 @@ export default function DashboardScreen() {
             color={COLORS.primary}
           />
         </View>
-
         <Text style={styles.sectionTitle}>Ações Rápidas</Text>
 
         <View style={styles.actionsContainer}>
+          <ActionButton
+            title="Meu Desempenho"
+            onPress={() => router.push('/dashboard/eu')}
+            icon={<BarChart size={20} color="#FFFFFF" />}
+          />
+          <ActionButton
+            title="Ver Extrato"
+            onPress={() => router.push('/dashboard/extrato')}
+            icon={<FileText size={20} color="#FFFFFF" />}
+          />
+          <ActionButton
+            title="Ranking"
+            onPress={() => router.push('/dashboard/gamificacao')}
+            icon={<BarChart size={20} color="#FFFFFF" />}
+          />
+
           <ActionButton
             title="Fazer Novo Pedido"
             onPress={() => router.push('/order/new')}
@@ -207,6 +224,17 @@ export default function DashboardScreen() {
                 onPress={() => router.push('/admin/Afiliados')}
                 icon={<Users size={20} color="#FFFFFF" />}
               />
+              <ActionButton
+                title="Dashboard Admin"
+                onPress={() => router.push('/admin/AdminDashboard')}
+                icon={<BarChart size={20} color="#FFFFFF" />}
+              />
+              <ActionButton
+                title="Gestão de Pagamentos"
+                onPress={() => router.push('/admin/pagamentos')}
+                icon={<CreditCard size={20} color="#FFFFFF" />}
+              />
+
               <ActionButton
                 title="Alterar Produtos"
                 onPress={() => router.push('/admin/AlterarProdutos')}
