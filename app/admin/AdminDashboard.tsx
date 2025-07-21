@@ -39,25 +39,26 @@ export default function AdminDashboard() {
         const affiliateSet = new Set(orders?.map((o) => o.affiliate_id));
         const totalAffiliates = affiliateSet.size;
 
-        // Comissões pagas
+        // Comissões pagas por afiliado
         const { data: commissions, error: commissionsError } = await supabase
           .from('commissions')
-          .select('amount')
+          .select('affiliate_id, amount')
           .eq('status', 'paid');
 
         if (commissionsError) throw commissionsError;
 
         const totalPaidCommissions = commissions?.reduce((sum, c) => sum + (c.amount || 0), 0) || 0;
 
-        // Top 10 afiliados por volume de vendas
-        const affiliateMap: Record<string, number> = {};
-        orders?.forEach((o) => {
-          if (!o.affiliate_id) return;
-          if (!affiliateMap[o.affiliate_id]) affiliateMap[o.affiliate_id] = 0;
-          affiliateMap[o.affiliate_id] += o.total_amount || 0;
+        const commissionsByAffiliate: Record<string, number> = {};
+        commissions?.forEach((c) => {
+          if (!c.affiliate_id) return;
+          if (!commissionsByAffiliate[c.affiliate_id]) {
+            commissionsByAffiliate[c.affiliate_id] = 0;
+          }
+          commissionsByAffiliate[c.affiliate_id] += c.amount || 0;
         });
 
-        const top = Object.entries(affiliateMap)
+        const top = Object.entries(commissionsByAffiliate)
           .map(([id, value]) => ({ id, value }))
           .sort((a, b) => b.value - a.value)
           .slice(0, 10);
