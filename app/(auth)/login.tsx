@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TextInput,
+  Platform,
   TouchableOpacity,
   Image,
   ScrollView,
@@ -16,6 +17,9 @@ import { useAuth } from '@/context/AuthContext';
 import { Lock, Mail } from 'lucide-react-native';
 import bcrypt from 'bcryptjs';
 import { createClient } from '@/lib/supabase';
+import * as Print from 'expo-print';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 const supabase = createClient();
 
@@ -69,6 +73,86 @@ export default function LoginScreen() {
       Alert.alert('Erro inesperado', 'Ocorreu um erro. Tente novamente mais tarde.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDownloadCatalog = async () => {
+    try {
+      // 1. Buscar produtos no Supabase
+      const { data: products, error } = await supabase
+        .from('products')
+        .select('name, price, description, image_url');
+  
+      if (error) {
+        console.error(error);
+        Alert.alert('Erro', 'Não foi possível carregar os produtos.');
+        return;
+      }
+  
+      if (!products || products.length === 0) {
+        Alert.alert('Aviso', 'Nenhum produto encontrado.');
+        return;
+      }
+  
+      // 2. Montar HTML do PDF
+      const htmlContent = `
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; }
+              h1 { text-align: center; color: #333; }
+              .product { border: 1px solid #ccc; padding: 10px; margin-bottom: 20px; border-radius: 8px; }
+              .product img { width: 150px; height: auto; margin-bottom: 10px; }
+              .product-name { font-size: 18px; font-weight: bold; }
+              .product-price { color: green; font-weight: bold; }
+            </style>
+          </head>
+          <body>
+            <h1>Catálogo de Produtos</h1>
+            ${products.map(p => `
+              <div class="product">
+                <img src="${p.image_url}" />
+                <div class="product-name">${p.name}</div>
+                <div class="product-price">R$ ${p.price.toFixed(2)}</div>
+                <div>${p.description || ''}</div>
+              </div>
+            `).join('')}
+          </body>
+        </html>
+      `;
+  
+      // 3. Gerar PDF (gera um arquivo temporário)
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+  
+      const pdfName = 'catalogo.pdf';
+  
+      if (Platform.OS === 'android') {
+        // Android: salvar na pasta Downloads via StorageAccessFramework
+        const permission = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Permissão negada', 'Não foi possível salvar o arquivo sem permissão.');
+          return;
+        }
+        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+        await FileSystem.StorageAccessFramework.createFileAsync(permission.directoryUri, pdfName, 'application/pdf')
+          .then(async (fileUri) => {
+            await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+            Alert.alert('Sucesso', 'Catálogo salvo na pasta Downloads!');
+          })
+          .catch(err => {
+            console.error(err);
+            Alert.alert('Erro', 'Não foi possível salvar o arquivo.');
+          });
+      } else {
+        // iOS: salvar local e abrir compartilhamento
+        const newPath = FileSystem.documentDirectory + pdfName;
+        await FileSystem.copyAsync({ from: uri, to: newPath });
+        await Sharing.shareAsync(newPath);
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Erro', 'Ocorreu um problema ao gerar o catálogo.');
     }
   };
 
@@ -153,6 +237,14 @@ export default function LoginScreen() {
               <Text style={styles.buttonText}>ENTRAR</Text>
             )}
           </TouchableOpacity>
+
+          {/* Botão Baixar Catálogo */}
+<TouchableOpacity
+  style={[styles.button, { backgroundColor: COLORS.secondary, marginTop: 10 }]}
+  onPress={handleDownloadCatalog}
+>
+  <Text style={styles.buttonText}>BAIXAR CATÁLOGO</Text>
+</TouchableOpacity>
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Ainda não tem uma conta? </Text>
