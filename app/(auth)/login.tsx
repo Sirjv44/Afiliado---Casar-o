@@ -76,25 +76,17 @@ export default function LoginScreen() {
     }
   };
 
-  const handleDownloadCatalog = async () => {
+  const handleDownloadCatalogWeb = async () => {
     try {
-      // 1. Buscar produtos no Supabase
       const { data: products, error } = await supabase
         .from('products')
         .select('name, price, description, image_url');
   
-      if (error) {
-        console.error(error);
+      if (error || !products || products.length === 0) {
         Alert.alert('Erro', 'Não foi possível carregar os produtos.');
         return;
       }
   
-      if (!products || products.length === 0) {
-        Alert.alert('Aviso', 'Nenhum produto encontrado.');
-        return;
-      }
-  
-      // 2. Montar HTML do PDF
       const htmlContent = `
         <html>
           <head>
@@ -122,34 +114,11 @@ export default function LoginScreen() {
         </html>
       `;
   
-      // 3. Gerar PDF (gera um arquivo temporário)
-      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      // Abre em nova aba como PDF
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
   
-      const pdfName = 'catalogo.pdf';
-  
-      if (Platform.OS === 'android') {
-        // Android: salvar na pasta Downloads via StorageAccessFramework
-        const permission = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-        if (!permission.granted) {
-          Alert.alert('Permissão negada', 'Não foi possível salvar o arquivo sem permissão.');
-          return;
-        }
-        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-        await FileSystem.StorageAccessFramework.createFileAsync(permission.directoryUri, pdfName, 'application/pdf')
-          .then(async (fileUri) => {
-            await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
-            Alert.alert('Sucesso', 'Catálogo salvo na pasta Downloads!');
-          })
-          .catch(err => {
-            console.error(err);
-            Alert.alert('Erro', 'Não foi possível salvar o arquivo.');
-          });
-      } else {
-        // iOS: salvar local e abrir compartilhamento
-        const newPath = FileSystem.documentDirectory + pdfName;
-        await FileSystem.copyAsync({ from: uri, to: newPath });
-        await Sharing.shareAsync(newPath);
-      }
     } catch (err) {
       console.error(err);
       Alert.alert('Erro', 'Ocorreu um problema ao gerar o catálogo.');
@@ -241,7 +210,7 @@ export default function LoginScreen() {
           {/* Botão Baixar Catálogo */}
 <TouchableOpacity
   style={[styles.button, { backgroundColor: COLORS.secondary, marginTop: 10 }]}
-  onPress={handleDownloadCatalog}
+  onPress={handleDownloadCatalogWeb}
 >
   <Text style={styles.buttonText}>BAIXAR CATÁLOGO</Text>
 </TouchableOpacity>
