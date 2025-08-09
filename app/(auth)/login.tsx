@@ -74,53 +74,73 @@ export default function LoginScreen() {
     }
   };
 
-  const handleDownloadCatalogWeb = async () => {
+  async function toBase64Image(url) {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  }
+  
+  async function handleDownloadCatalogWeb() {
     try {
+      // 1. Buscar produtos
       const { data: products, error } = await supabase
         .from('products')
         .select('name, price, image_url');
   
-      if (error || !products || products.length === 0) {
+      if (error) throw error;
+      if (!products || products.length === 0) {
         alert('Nenhum produto encontrado.');
         return;
       }
   
-      // Criar o conteúdo HTML
+      // 2. Converter imagens para base64
+      const productsWithBase64 = await Promise.all(
+        products.map(async (p) => ({
+          ...p,
+          imageBase64: await toBase64Image(p.image_url),
+        }))
+      );
+  
+      // 3. Criar HTML sem descrição
       const htmlContent = `
         <div style="font-family: Arial, sans-serif; padding: 20px;">
-          <h1 style="text-align: center;">Catálogo de Produtos</h1>
+          <h1 style="text-align:center;">Catálogo de Produtos</h1>
           <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
-            ${products.map(p => `
-              <div style="border: 1px solid #ccc; padding: 10px; border-radius: 8px; width: 200px; text-align: center;">
-                <img src="${p.image_url}" style="width: 150px; height: 150px; object-fit: cover;" />
-                <div style="font-size: 14px; font-weight: bold; margin-top: 5px;">${p.name}</div>
-                <div style="color: green; font-weight: bold; font-size: 13px;">R$ ${p.price.toFixed(2)}</div>
-              </div>
-            `).join('')}
+            ${productsWithBase64
+              .map(
+                (p) => `
+                <div style="border: 1px solid #ccc; border-radius: 8px; padding: 10px; width: 200px; text-align: center;">
+                  <img src="${p.imageBase64}" style="width: 150px; height: auto; margin-bottom: 10px;" />
+                  <div style="font-weight: bold; font-size: 16px;">${p.name}</div>
+                  <div style="color: green; font-weight: bold;">R$ ${p.price.toFixed(2)}</div>
+                </div>
+              `
+              )
+              .join('')}
           </div>
         </div>
       `;
   
-      // Criar um elemento temporário
-      const container = document.createElement('div');
-      container.innerHTML = htmlContent;
+      // 4. Gerar e baixar PDF
+      const opt = {
+        margin: 5,
+        filename: 'catalogo.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      };
   
-      // Gerar e baixar PDF
-      html2pdf()
-        .from(container)
-        .set({
-          margin: 10,
-          filename: 'catalogo.pdf',
-          html2canvas: { scale: 2 },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        })
-        .save();
-      
+      html2pdf().from(htmlContent).set(opt).save();
+  
     } catch (err) {
       console.error(err);
-      alert('Erro ao gerar o PDF.');
+      alert('Erro ao gerar o catálogo.');
     }
-  };
+  }
   
   const handleForgotPassword = async () => {
     if (!email) {
