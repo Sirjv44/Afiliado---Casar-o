@@ -17,9 +17,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Lock, Mail } from 'lucide-react-native';
 import bcrypt from 'bcryptjs';
 import { createClient } from '@/lib/supabase';
-import * as Print from 'expo-print';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import html2pdf from 'html2pdf.js';
 
 const supabase = createClient();
 
@@ -80,51 +78,50 @@ export default function LoginScreen() {
     try {
       const { data: products, error } = await supabase
         .from('products')
-        .select('name, price, description, image_url');
+        .select('name, price, image_url');
   
       if (error || !products || products.length === 0) {
-        Alert.alert('Erro', 'Não foi possível carregar os produtos.');
+        alert('Nenhum produto encontrado.');
         return;
       }
   
+      // Criar o conteúdo HTML
       const htmlContent = `
-        <html>
-          <head>
-            <meta charset="utf-8" />
-            <style>
-              body { font-family: Arial, sans-serif; padding: 20px; }
-              h1 { text-align: center; color: #333; }
-              .product { border: 1px solid #ccc; padding: 10px; margin-bottom: 20px; border-radius: 8px; }
-              .product img { width: 150px; height: auto; margin-bottom: 10px; }
-              .product-name { font-size: 18px; font-weight: bold; }
-              .product-price { color: green; font-weight: bold; }
-            </style>
-          </head>
-          <body>
-            <h1>Catálogo de Produtos</h1>
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <h1 style="text-align: center;">Catálogo de Produtos</h1>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
             ${products.map(p => `
-              <div class="product">
-                <img src="${p.image_url}" />
-                <div class="product-name">${p.name}</div>
-                <div class="product-price">R$ ${p.price.toFixed(2)}</div>
-                <div>${p.description || ''}</div>
+              <div style="border: 1px solid #ccc; padding: 10px; border-radius: 8px; width: 200px; text-align: center;">
+                <img src="${p.image_url}" style="width: 150px; height: 150px; object-fit: cover;" />
+                <div style="font-size: 14px; font-weight: bold; margin-top: 5px;">${p.name}</div>
+                <div style="color: green; font-weight: bold; font-size: 13px;">R$ ${p.price.toFixed(2)}</div>
               </div>
             `).join('')}
-          </body>
-        </html>
+          </div>
+        </div>
       `;
   
-      // Abre em nova aba como PDF
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
+      // Criar um elemento temporário
+      const container = document.createElement('div');
+      container.innerHTML = htmlContent;
   
+      // Gerar e baixar PDF
+      html2pdf()
+        .from(container)
+        .set({
+          margin: 10,
+          filename: 'catalogo.pdf',
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        })
+        .save();
+      
     } catch (err) {
       console.error(err);
-      Alert.alert('Erro', 'Ocorreu um problema ao gerar o catálogo.');
+      alert('Erro ao gerar o PDF.');
     }
   };
-
+  
   const handleForgotPassword = async () => {
     if (!email) {
       setShowRecoveryMessage(true);
