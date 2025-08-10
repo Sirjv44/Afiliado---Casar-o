@@ -101,6 +101,69 @@ export default function CatalogScreen() {
     }
   };
 
+  const handleDownloadCatalogWeb = async () => {
+  try {
+    const { data: products, error } = await supabase
+      .from('products')
+      .select('name, price, image_url');
+
+    if (error || !products || products.length === 0) {
+      Alert.alert('Erro', 'Não foi possível carregar os produtos.');
+      return;
+    }
+
+    const htmlContent = `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Catálogo de Produtos</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 10px; }
+            h1 { text-align: center; color: #333; margin-bottom: 20px; }
+            .grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+            .product { 
+              border: 1px solid #ccc; 
+              padding: 6px; 
+              border-radius: 6px; 
+              width: 180px; 
+              text-align: center;
+              font-size: 12px;
+            }
+            .product img { width: 140px; height: 140px; object-fit: cover; }
+            .product-name { font-weight: bold; margin-top: 4px; }
+            .product-price { color: green; font-weight: bold; margin-top: 2px; }
+          </style>
+        </head>
+        <body>
+          <h1>Catálogo de Produtos</h1>
+          <div class="grid">
+            ${products.map(p => `
+              <div class="product">
+                <img src="${p.image_url}?width=150" loading="lazy" />
+                <div class="product-name">${p.name}</div>
+                <div class="product-price">R$ ${p.price.toFixed(2)}</div>
+              </div>
+            `).join('')}
+          </div>
+          <script>
+            // Chama impressão rapidamente sem esperar todo carregamento
+            setTimeout(() => window.print(), 500);
+          </script>
+        </body>
+      </html>
+    `;
+
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+
+  } catch (err) {
+    console.error(err);
+    Alert.alert('Erro', 'Ocorreu um problema ao gerar o catálogo.');
+  }
+};
+
+
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
       fetchProducts();
@@ -177,6 +240,14 @@ export default function CatalogScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* Botão Baixar Catálogo */}
+<TouchableOpacity
+  style={[styles.button, { backgroundColor: COLORS.secondary, marginTop: 10 }]}
+  onPress={handleDownloadCatalogWeb}
+>
+  <Text style={styles.buttonText}>BAIXAR CATÁLOGO</Text>
+</TouchableOpacity>
 
       {/* Lista de produtos */}
       {loading ? (
