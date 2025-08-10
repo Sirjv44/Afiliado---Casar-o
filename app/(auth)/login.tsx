@@ -17,7 +17,6 @@ import { useAuth } from '@/context/AuthContext';
 import { Lock, Mail } from 'lucide-react-native';
 import bcrypt from 'bcryptjs';
 import { createClient } from '@/lib/supabase';
-import html2pdf from 'html2pdf.js';
 
 const supabase = createClient();
 
@@ -74,74 +73,70 @@ export default function LoginScreen() {
     }
   };
 
-  async function toBase64Image(url) {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.readAsDataURL(blob);
-    });
-  }
   
-  async function handleDownloadCatalogWeb() {
-    try {
-      // 1. Buscar produtos
-      const { data: products, error } = await supabase
-        .from('products')
-        .select('name, price, image_url');
-  
-      if (error) throw error;
-      if (!products || products.length === 0) {
-        alert('Nenhum produto encontrado.');
-        return;
-      }
-  
-      // 2. Converter imagens para base64
-      const productsWithBase64 = await Promise.all(
-        products.map(async (p) => ({
-          ...p,
-          imageBase64: await toBase64Image(p.image_url),
-        }))
-      );
-  
-      // 3. Criar HTML sem descrição
-      const htmlContent = `
-        <div style="font-family: Arial, sans-serif; padding: 20px;">
-          <h1 style="text-align:center;">Catálogo de Produtos</h1>
-          <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
-            ${productsWithBase64
-              .map(
-                (p) => `
-                <div style="border: 1px solid #ccc; border-radius: 8px; padding: 10px; width: 200px; text-align: center;">
-                  <img src="${p.imageBase64}" style="width: 150px; height: auto; margin-bottom: 10px;" />
-                  <div style="font-weight: bold; font-size: 16px;">${p.name}</div>
-                  <div style="color: green; font-weight: bold;">R$ ${p.price.toFixed(2)}</div>
-                </div>
-              `
-              )
-              .join('')}
-          </div>
-        </div>
-      `;
-  
-      // 4. Gerar e baixar PDF
-      const opt = {
-        margin: 5,
-        filename: 'catalogo.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      };
-  
-      html2pdf().from(htmlContent).set(opt).save();
-  
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao gerar o catálogo.');
+  const handleDownloadCatalogWeb = async () => {
+  try {
+    const { data: products, error } = await supabase
+      .from('products')
+      .select('name, price, image_url');
+
+    if (error || !products || products.length === 0) {
+      Alert.alert('Erro', 'Não foi possível carregar os produtos.');
+      return;
     }
+
+    const htmlContent = `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Catálogo de Produtos</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { text-align: center; color: #333; }
+            .grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+            .product { 
+              border: 1px solid #ccc; 
+              padding: 10px; 
+              border-radius: 8px; 
+              width: 200px; 
+              text-align: center;
+            }
+            .product img { width: 150px; height: 150px; object-fit: cover; }
+            .product-name { font-size: 14px; font-weight: bold; margin-top: 5px; }
+            .product-price { color: green; font-weight: bold; font-size: 13px; }
+          </style>
+        </head>
+        <body>
+          <h1>Catálogo de Produtos</h1>
+          <div class="grid">
+            ${products.map(p => `
+              <div class="product">
+                <img src="${p.image_url}" />
+                <div class="product-name">${p.name}</div>
+                <div class="product-price">R$ ${p.price.toFixed(2)}</div>
+              </div>
+            `).join('')}
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+            }
+          </script>
+        </body>
+      </html>
+    `;
+
+    // Criar blob e abrir nova aba
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+
+  } catch (err) {
+    console.error(err);
+    Alert.alert('Erro', 'Ocorreu um problema ao gerar o catálogo.');
   }
-  
+};
+
   const handleForgotPassword = async () => {
     if (!email) {
       setShowRecoveryMessage(true);
