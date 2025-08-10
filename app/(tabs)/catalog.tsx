@@ -101,7 +101,7 @@ export default function CatalogScreen() {
     }
   };
 
-  const handleDownloadCatalogWeb = async () => {
+    const handleDownloadCatalogWeb = async () => {
   try {
     const { data: products, error } = await supabase
       .from('products')
@@ -118,20 +118,19 @@ export default function CatalogScreen() {
           <meta charset="utf-8" />
           <title>Catálogo de Produtos</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 10px; }
-            h1 { text-align: center; color: #333; margin-bottom: 20px; }
-            .grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { text-align: center; color: #333; }
+            .grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
             .product { 
               border: 1px solid #ccc; 
-              padding: 6px; 
-              border-radius: 6px; 
-              width: 180px; 
+              padding: 10px; 
+              border-radius: 8px; 
+              width: 200px; 
               text-align: center;
-              font-size: 12px;
             }
-            .product img { width: 140px; height: 140px; object-fit: cover; }
-            .product-name { font-weight: bold; margin-top: 4px; }
-            .product-price { color: green; font-weight: bold; margin-top: 2px; }
+            .product img { width: 150px; height: 150px; object-fit: cover; }
+            .product-name { font-size: 14px; font-weight: bold; margin-top: 5px; }
+            .product-price { color: green; font-weight: bold; font-size: 13px; }
           </style>
         </head>
         <body>
@@ -139,20 +138,22 @@ export default function CatalogScreen() {
           <div class="grid">
             ${products.map(p => `
               <div class="product">
-                <img src="${p.image_url}?width=150" loading="lazy" />
+                <img src="${p.image_url}" />
                 <div class="product-name">${p.name}</div>
                 <div class="product-price">R$ ${p.price.toFixed(2)}</div>
               </div>
             `).join('')}
           </div>
           <script>
-            // Chama impressão rapidamente sem esperar todo carregamento
-            setTimeout(() => window.print(), 500);
+            window.onload = function() {
+              window.print();
+            }
           </script>
         </body>
       </html>
     `;
 
+    // Criar blob e abrir nova aba
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
