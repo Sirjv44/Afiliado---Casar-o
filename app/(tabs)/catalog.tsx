@@ -210,6 +210,14 @@ export default function CatalogScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Botão Baixar Catálogo */}
+<TouchableOpacity
+  style={[styles.button, { backgroundColor: COLORS.secondary, marginTop: 10 }]}
+  onPress={handleDownloadCatalogWeb}
+>
+  <Text style={styles.buttonText}>BAIXAR CATÁLOGO</Text>
+</TouchableOpacity>
+
       {/* Categorias */}
       <ScrollView
         horizontal
@@ -240,14 +248,6 @@ export default function CatalogScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
-
-      {/* Botão Baixar Catálogo */}
-<TouchableOpacity
-  style={[styles.button, { backgroundColor: COLORS.secondary, marginTop: 10 }]}
-  onPress={handleDownloadCatalogWeb}
->
-  <Text style={styles.buttonText}>BAIXAR CATÁLOGO</Text>
-</TouchableOpacity>
 
       {/* Lista de produtos */}
       {loading ? (
