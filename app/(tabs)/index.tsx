@@ -39,6 +39,63 @@ export default function DashboardScreen() {
     totalCommission: 0,
   });
 
+  // Função para baixar catálogo
+  const handleDownloadCatalogWeb = async () => {
+    try {
+      const supabase = createClient();
+      const { data: products, error } = await supabase
+        .from('products')
+        .select('name, price, image_url');
+
+      if (error || !products || products.length === 0) {
+        alert('Não foi possível carregar o catálogo.');
+        return;
+      }
+
+      const htmlContent = `
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>Catálogo de Produtos</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 10px; }
+              h1 { text-align: center; color: #333; margin-bottom: 20px; }
+              .grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+              .product { border: 1px solid #ccc; padding: 5px; border-radius: 6px; width: 180px; text-align: center; }
+              .product img { width: 150px; height: 150px; object-fit: cover; }
+              .product-name { font-size: 12px; font-weight: bold; margin-top: 5px; }
+              .product-price { color: green; font-weight: bold; font-size: 12px; }
+            </style>
+          </head>
+          <body>
+            <h1>Catálogo de Produtos</h1>
+            <div class="grid">
+              ${products.map(p => `
+                <div class="product">
+                  <img src="${p.image_url}" />
+                  <div class="product-name">${p.name}</div>
+                  <div class="product-price">R$ ${p.price.toFixed(2)}</div>
+                </div>
+              `).join('')}
+            </div>
+            <script>
+              window.onload = function() {
+                window.print();
+              }
+            </script>
+          </body>
+        </html>
+      `;
+
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao gerar catálogo.');
+    }
+  };
+
   const handleLogout = async () => {
     try {
       setIsLoading(true);
@@ -195,6 +252,12 @@ export default function DashboardScreen() {
           <ActionButton
             title="Ver Catálogo"
             onPress={() => router.push('/(tabs)/catalog')}
+            icon={<Database size={20} color="#FFFFFF" />}
+          />
+          {/* Novo botão para baixar catálogo */}
+          <ActionButton
+            title="Baixar Catálogo"
+            onPress={handleDownloadCatalogWeb}
             icon={<Database size={20} color="#FFFFFF" />}
           />
           <ActionButton

@@ -80,20 +80,28 @@ export default function CatalogScreen() {
         .from('products')
         .select('category')
         .gt('stock', 0);
-
+  
       if (error) {
         console.error('Erro ao buscar categorias:', error.message);
       } else if (data) {
+        // Extrair categorias únicas em lowercase e sem vazios
+        const uniqueCatsSet = new Set(
+          data
+            .map((p) => (p.category ? p.category.trim().toLowerCase() : ''))
+            .filter((c) => c !== '')
+        );
+  
+        // Garantir que "todos" não esteja duplicado (remove caso exista)
+        uniqueCatsSet.delete('todos');
+  
+        // Construir o array final, incluindo "Todos" no começo
         const uniqueCategories = [
           'Todos',
-          ...Array.from(
-            new Set(
-              data
-                .map((p) => (p.category ? p.category.trim().toLowerCase() : ''))
-                .filter((c) => c !== '')
-            )
-          ).map((c) => c.charAt(0).toUpperCase() + c.slice(1)),
+          ...Array.from(uniqueCatsSet).map(
+            (c) => c.charAt(0).toUpperCase() + c.slice(1)
+          ),
         ];
+  
         setCategories(uniqueCategories);
       }
     } catch (error) {
