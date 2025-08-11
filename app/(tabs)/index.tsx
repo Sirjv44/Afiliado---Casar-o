@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  Platform,
   Image,
   TouchableOpacity,
   Dimensions,
@@ -26,6 +27,8 @@ import {
   FileText,
 } from 'lucide-react-native';
 import { createClient } from '@/lib/supabase';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 export default function DashboardScreen() {
   const { user, signOut } = useAuth();
@@ -40,59 +43,33 @@ export default function DashboardScreen() {
   });
 
   // Função para baixar catálogo
-  const handleDownloadCatalogWeb = async () => {
+  const handleDownloadCatalog = async () => {
     try {
-      const supabase = createClient();
-      const { data: products, error } = await supabase
-        .from('products')
-        .select('name, price, image_url');
-
-      if (error || !products || products.length === 0) {
-        alert('Não foi possível carregar o catálogo.');
-        return;
+      // Caminho do arquivo dentro da pasta assets do app
+      const assetUri = FileSystem.bundleDirectory + 'assets/catalogo_de_produtos.pdf';
+  
+      // Caminho para salvar no dispositivo (cache, ou documentos)
+      const destinationUri = FileSystem.documentDirectory + 'catalogo_de_produtos.pdf';
+  
+      // Copiar o arquivo da pasta bundle para local acessível
+      await FileSystem.copyAsync({
+        from: assetUri,
+        to: destinationUri,
+      });
+  
+      // Agora abre o compartilhamento para o usuário salvar, abrir, etc
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+        await Sharing.shareAsync(destinationUri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Compartilhar Catálogo PDF',
+          UTI: 'com.adobe.pdf', // para iOS
+        });
+      } else {
+        alert('Download não suportado nesta plataforma');
       }
-
-      const htmlContent = `
-        <html>
-          <head>
-            <meta charset="utf-8" />
-            <title>Catálogo de Produtos</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 10px; }
-              h1 { text-align: center; color: #333; margin-bottom: 20px; }
-              .grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-              .product { border: 1px solid #ccc; padding: 5px; border-radius: 6px; width: 180px; text-align: center; }
-              .product img { width: 150px; height: 150px; object-fit: cover; }
-              .product-name { font-size: 12px; font-weight: bold; margin-top: 5px; }
-              .product-price { color: green; font-weight: bold; font-size: 12px; }
-            </style>
-          </head>
-          <body>
-            <h1>Catálogo de Produtos</h1>
-            <div class="grid">
-              ${products.map(p => `
-                <div class="product">
-                  <img src="${p.image_url}" />
-                  <div class="product-name">${p.name}</div>
-                  <div class="product-price">R$ ${p.price.toFixed(2)}</div>
-                </div>
-              `).join('')}
-            </div>
-            <script>
-              window.onload = function() {
-                window.print();
-              }
-            </script>
-          </body>
-        </html>
-      `;
-
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao gerar catálogo.');
+    } catch (error) {
+      console.error('Erro ao baixar catálogo:', error);
+      alert('Falha ao baixar catálogo.');
     }
   };
 
@@ -257,7 +234,7 @@ export default function DashboardScreen() {
           {/* Novo botão para baixar catálogo */}
           <ActionButton
             title="Baixar Catálogo"
-            onPress={handleDownloadCatalogWeb}
+            onPress={handleDownloadCatalog}
             icon={<Database size={20} color="#FFFFFF" />}
           />
           <ActionButton
