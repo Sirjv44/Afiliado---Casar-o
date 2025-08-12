@@ -17,6 +17,8 @@ import { useAuth } from '@/context/AuthContext';
 import { Lock, Mail } from 'lucide-react-native';
 import bcrypt from 'bcryptjs';
 import { createClient } from '@/lib/supabase';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 const supabase = createClient();
 
@@ -74,68 +76,36 @@ export default function LoginScreen() {
   };
 
   
-  const handleDownloadCatalogWeb = async () => {
-  try {
-    const { data: products, error } = await supabase
-      .from('products')
-      .select('name, price, image_url');
-
-    if (error || !products || products.length === 0) {
-      Alert.alert('Erro', 'Não foi possível carregar os produtos.');
-      return;
-    }
-
-    const htmlContent = `
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>Catálogo de Produtos</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h1 { text-align: center; color: #333; }
-            .grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-            .product { 
-              border: 1px solid #ccc; 
-              padding: 10px; 
-              border-radius: 8px; 
-              width: 200px; 
-              text-align: center;
-            }
-            .product img { width: 150px; height: 150px; object-fit: cover; }
-            .product-name { font-size: 14px; font-weight: bold; margin-top: 5px; }
-            .product-price { color: green; font-weight: bold; font-size: 13px; }
-          </style>
-        </head>
-        <body>
-          <h1>Catálogo de Produtos</h1>
-          <div class="grid">
-            ${products.map(p => `
-              <div class="product">
-                <img src="${p.image_url}" />
-                <div class="product-name">${p.name}</div>
-                <div class="product-price">R$ ${p.price.toFixed(2)}</div>
-              </div>
-            `).join('')}
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-            }
-          </script>
-        </body>
-      </html>
-    `;
-
-    // Criar blob e abrir nova aba
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-
-  } catch (err) {
-    console.error(err);
-    Alert.alert('Erro', 'Ocorreu um problema ao gerar o catálogo.');
-  }
-};
+  // Função para baixar catálogo
+    const handleDownloadCatalog = async () => {
+      try {
+        if (Platform.OS === 'web') {
+          // Para web, só abre o PDF em outra aba, que o usuário pode baixar manualmente
+          window.open('/catalogo_de_produtos.pdf', '_blank');
+          return;
+        }
+    
+        // Para Android e iOS, faz o download e abre a opção de compartilhar/salvar
+        const assetUri = FileSystem.bundleDirectory + 'assets/catalogo_de_produtos.pdf';
+        const destinationUri = FileSystem.documentDirectory + 'catalogo_de_produtos.pdf';
+    
+        // Copia o arquivo do bundle para documentos (local acessível)
+        await FileSystem.copyAsync({
+          from: assetUri,
+          to: destinationUri,
+        });
+    
+        // Abre o diálogo para compartilhar / abrir o PDF
+        await Sharing.shareAsync(destinationUri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Compartilhar Catálogo PDF',
+          UTI: 'com.adobe.pdf',
+        });
+      } catch (error) {
+        console.error('Erro ao baixar catálogo:', error);
+        Alert.alert('Erro', 'Falha ao baixar catálogo.');
+      }
+    };
 
   const handleForgotPassword = async () => {
     if (!email) {
@@ -220,12 +190,12 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           {/* Botão Baixar Catálogo */}
-<TouchableOpacity
-  style={[styles.button, { backgroundColor: COLORS.secondary, marginTop: 10 }]}
-  onPress={handleDownloadCatalogWeb}
->
-  <Text style={styles.buttonText}>BAIXAR CATÁLOGO</Text>
-</TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: COLORS.secondary, marginTop: 10 }]}
+            onPress={handleDownloadCatalog}
+          >
+            <Text style={styles.buttonText}>BAIXAR CATÁLOGO</Text>
+          </TouchableOpacity>
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Ainda não tem uma conta? </Text>
