@@ -302,14 +302,21 @@ export default function DashboardScreen() {
           </>
         )}
 
-        <Text style={styles.sectionTitle}>Promoções da Semana!</Text>
+      <Text style={styles.sectionTitle}>Promoções da Semana!</Text>
 
-        {ofertasSemana.length > 0 ? (
-          ofertasSemana.map((oferta, index) => (
+      {ofertasSemana.length > 0 ? (
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          style={styles.promotionsCarousel}
+        >
+          {ofertasSemana.map((oferta, index) => (
             <View key={index} style={styles.promotionContainer}>
               <Text style={styles.promotionTitle}>{oferta.title}</Text>
               <Text style={styles.promotionText}>{oferta.description}</Text>
 
+              {/* Carrossel de imagens dentro de cada promoção */}
               <ScrollView
                 horizontal
                 pagingEnabled
@@ -335,10 +342,11 @@ export default function DashboardScreen() {
                 ))}
               </ScrollView>
             </View>
-          ))
-        ) : (
-          <ActivityIndicator size="small" color={COLORS.textSecondary} />
-        )}
+          ))}
+        </ScrollView>
+      ) : (
+        <ActivityIndicator size="small" color={COLORS.textSecondary} />
+      )}
       </View>
     </ScrollView>
   );
@@ -412,6 +420,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
+  promotionsCarousel: {
+    marginTop: 10,
+  },
+  promotionContainer: {
+    width: Dimensions.get('window').width - 60, // largura de cada slide
+    backgroundColor: COLORS.secondaryLight,
+    borderRadius: 12,
+    padding: 20,
+    marginHorizontal: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.accent,
+  },  
   carouselImage: {
     width: Dimensions.get('window').width - 280,
     height: 180,

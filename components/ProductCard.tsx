@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ToastAndroid, Platform } from 'react-native';
 import { COLORS } from '@/constants/Colors';
 import { ShoppingCart, Bookmark, BookmarkCheck } from 'lucide-react-native';
@@ -13,6 +13,7 @@ export interface Product {
   description: string | null;
   category: string;
   image_url: string;
+  commission_percentage?: number | null; // adicionando o campo da tabela
 }
 
 interface ProductCardProps {
@@ -27,7 +28,26 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
   const [isLoadingFavorite, setIsLoadingFavorite] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
 
-  const descriptionLimit = 100; // limite de caracteres
+  const descriptionLimit = 100;
+
+  const highCommissionKeywords = ['tribulus', 'maca peruana', 'provitalis', 'cindura', 'ioimbina', 'viper'];
+
+  // cálculo da comissão
+  const commissionRate = useMemo(() => {
+    const name = product.name.toLowerCase();
+    const isHighCommission = highCommissionKeywords.some(
+      (keyword) => name.startsWith(keyword) || name.includes(keyword)
+    );
+
+    const isValidPercentage =
+      typeof product.commission_percentage === 'number' && !isNaN(product.commission_percentage);
+
+    return isValidPercentage
+      ? product.commission_percentage
+      : isHighCommission
+      ? 0.4
+      : 0.15;
+  }, [product]);
 
   useEffect(() => {
     const checkFavorite = async () => {
@@ -105,8 +125,14 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
     <TouchableOpacity style={styles.card} onPress={() => onViewDetails(product)} activeOpacity={0.9}>
       <Image source={{ uri: product.image_url }} style={styles.image} />
 
+      {/* Badge de categoria */}
       <View style={styles.categoryBadge}>
         <Text style={styles.categoryText}>{product.category}</Text>
+      </View>
+
+      {/* Badge da comissão */}
+      <View style={styles.commissionBadge}>
+        <Text style={styles.commissionText}>{(commissionRate * 100).toFixed(0)}% Comissão</Text>
       </View>
 
       <View style={styles.contentContainer}>
@@ -179,6 +205,20 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: 12,
     fontWeight: '500',
+  },
+  commissionBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  commissionText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   contentContainer: {
     padding: 16,
