@@ -6,6 +6,7 @@ import {
   ScrollView,
   Platform,
   Image,
+  Alert,
   TouchableOpacity,
   Dimensions,
   ActivityIndicator,
@@ -16,6 +17,7 @@ import * as Sharing from 'expo-sharing';
 import { COLORS } from '@/constants/Colors';
 import StatusCard from '@/components/StatusCard';
 import ActionButton from '@/components/ActionButton';
+import { Asset } from 'expo-asset';
 import { useAuth } from '@/context/AuthContext';
 import {
   ShoppingBag,
@@ -44,34 +46,34 @@ export default function DashboardScreen() {
 
   // Função para baixar catálogo
   const handleDownloadCatalog = async () => {
-  try {
-    // Caminho do arquivo dentro da pasta assets do app
-    const assetUri = FileSystem.bundleDirectory + 'assets/catalogo_de_produtos.pdf';
-
-    // Caminho para salvar no dispositivo (cache, ou documentos)
-    const destinationUri = FileSystem.documentDirectory + 'catalogo_de_produtos.pdf';
-
-    // Copiar o arquivo da pasta bundle para local acessível
-    await FileSystem.copyAsync({
-      from: assetUri,
-      to: destinationUri,
-    });
-
-    // Agora abre o compartilhamento para o usuário salvar, abrir, etc
-    if (Platform.OS === 'ios' || Platform.OS === 'android') {
+    try {
+      if (Platform.OS === 'web') {
+        // Para web, só abre o PDF em outra aba, que o usuário pode baixar manualmente
+        window.open('/assets/catalogo_de_produtos.pdf', '_blank');
+        return;
+      }
+  
+      // Para Android e iOS, faz o download e abre a opção de compartilhar/salvar
+      const assetUri = FileSystem.bundleDirectory + 'assets/catalogo_de_produtos.pdf';
+      const destinationUri = FileSystem.documentDirectory + 'catalogo_de_produtos.pdf';
+  
+      // Copia o arquivo do bundle para documentos (local acessível)
+      await FileSystem.copyAsync({
+        from: assetUri,
+        to: destinationUri,
+      });
+  
+      // Abre o diálogo para compartilhar / abrir o PDF
       await Sharing.shareAsync(destinationUri, {
         mimeType: 'application/pdf',
         dialogTitle: 'Compartilhar Catálogo PDF',
-        UTI: 'com.adobe.pdf', // para iOS
+        UTI: 'com.adobe.pdf',
       });
-    } else {
-      alert('Download não suportado nesta plataforma');
+    } catch (error) {
+      console.error('Erro ao baixar catálogo:', error);
+      Alert.alert('Erro', 'Falha ao baixar catálogo.');
     }
-  } catch (error) {
-    console.error('Erro ao baixar catálogo:', error);
-    alert('Falha ao baixar catálogo.');
-  }
-};
+  };
 
   const handleLogout = async () => {
     try {
