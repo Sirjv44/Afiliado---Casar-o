@@ -49,7 +49,7 @@ export default function DashboardScreen() {
     try {
       if (Platform.OS === 'web') {
         // Para web, só abre o PDF em outra aba, que o usuário pode baixar manualmente
-        window.open('/assets/catalogo_de_produtos.pdf', '_blank');
+        window.open('/catalogo_de_produtos.pdf', '_blank');
         return;
       }
   
