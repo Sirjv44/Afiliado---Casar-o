@@ -600,7 +600,7 @@ export default function NewOrderScreen() {
       ? item.commission_percentage
       : isHighCommission
         ? 0.4
-        : 0.15;
+        : 0.20;
 
 
     const amount = parseFloat((item.price * item.quantity * commissionRate).toFixed(2));

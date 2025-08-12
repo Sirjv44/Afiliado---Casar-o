@@ -33,21 +33,28 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
   const highCommissionKeywords = ['tribulus', 'maca peruana', 'provitalis', 'cindura', 'ioimbina', 'viper'];
 
   // cálculo da comissão
-  const commissionRate = useMemo(() => {
-    const name = product.name.toLowerCase();
-    const isHighCommission = highCommissionKeywords.some(
-      (keyword) => name.startsWith(keyword) || name.includes(keyword)
-    );
+  // cálculo da comissão (mantendo sua regra)
+const commissionRate = useMemo(() => {
+  const name = product.name.toLowerCase();
+  const isHighCommission = highCommissionKeywords.some(
+    (keyword) => name.startsWith(keyword) || name.includes(keyword)
+  );
 
-    const isValidPercentage =
-      typeof product.commission_percentage === 'number' && !isNaN(product.commission_percentage);
+  const isValidPercentage =
+    typeof product.commission_percentage === 'number' && !isNaN(product.commission_percentage);
 
-    return isValidPercentage
-      ? product.commission_percentage
-      : isHighCommission
-      ? 0.4
-      : 0.15;
-  }, [product]);
+  return isValidPercentage
+    ? product.commission_percentage
+    : isHighCommission
+    ? 0.4
+    : 0.20;
+}, [product]);
+
+// valor da comissão em reais
+const commissionValue = useMemo(() => {
+  return product.price * commissionRate;
+}, [product.price, commissionRate]);
+
 
   useEffect(() => {
     const checkFavorite = async () => {
@@ -132,7 +139,10 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
 
       {/* Badge da comissão */}
       <View style={styles.commissionBadge}>
-        <Text style={styles.commissionText}>{(commissionRate * 100).toFixed(0)}% Comissão</Text>
+      <Text style={styles.commissionText}>
+        Comissão R$ {commissionValue.toFixed(2)}
+      </Text>
+
       </View>
 
       <View style={styles.contentContainer}>
