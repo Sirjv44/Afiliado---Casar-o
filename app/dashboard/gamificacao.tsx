@@ -20,72 +20,104 @@ export default function GamificacaoScreen() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // mês atual
   const [availableMonths, setAvailableMonths] = useState<number[]>([]);
 
-  useEffect(() => {
-    const fetchRanking = async () => {
-      if (availableMonths.length === 0) return; // espera meses carregarem
-  
-      try {
-        setLoading(true);
-        const supabase = createClient();
-  
-        const startOfMonth = new Date(new Date().getFullYear(), selectedMonth, 1);
-        const endOfMonth = new Date(new Date().getFullYear(), selectedMonth + 1, 0);
-  
-        const { data: orders } = await supabase
-          .from('orders')
-          .select('affiliate_id, total_amount')
-          .eq('status', 'delivered')
-          .gte('created_at', startOfMonth.toISOString())
-          .lte('created_at', endOfMonth.toISOString());
-  
-        if (!orders || orders.length === 0) {
-          setRanking([]);
-          setRecordePessoal(0);
-          setMaiorVenda(1);
-          return;
-        }
-  
-        const salesByAffiliate: Record<string, number> = {};
-        orders.forEach((o) => {
-          if (!salesByAffiliate[o.affiliate_id]) salesByAffiliate[o.affiliate_id] = 0;
-          salesByAffiliate[o.affiliate_id] += o.total_amount || 0;
-        });
-  
-        const topAffiliates = Object.entries(salesByAffiliate)
-          .map(([id, total]) => ({ id, total }))
-          .sort((a, b) => b.total - a.total)
-          .slice(0, 5);
-  
-        const enriched = await Promise.all(
-          topAffiliates.map(async (item) => {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('id', item.id)
-              .single();
-            return {
-              name: profile?.full_name || 'Afiliado',
-              total: item.total,
-              isCurrentUser: item.id === user?.id,
-            };
-          })
-        );
-  
-        setRanking(enriched);
-        const currentUser = enriched.find((r) => r.isCurrentUser);
-        setRecordePessoal(currentUser?.total || 0);
-  
-        const maior = Math.max(...enriched.map((r) => r.total), 1);
-        setMaiorVenda(maior);
-      } catch (err) {
-        console.error('Erro no ranking:', err);
-      } finally {
-        setLoading(false);
+  // 1) Carregar meses disponíveis
+useEffect(() => {
+  const fetchAvailableMonths = async () => {
+    try {
+      const supabase = createClient();
+      const startOfYear = new Date(new Date().getFullYear(), 0, 1);
+
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('created_at')
+        .eq('status', 'delivered')
+        .gte('created_at', startOfYear.toISOString());
+
+      if (!orders) return;
+
+      const months = Array.from(new Set(
+        orders.map((o: any) => new Date(o.created_at).getMonth())
+      ));
+
+      setAvailableMonths(months);
+
+      // Seleciona o primeiro mês disponível
+      if (!months.includes(selectedMonth)) setSelectedMonth(months[0] || new Date().getMonth());
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  fetchAvailableMonths();
+}, []);
+
+// 2) Buscar ranking quando `availableMonths` ou `selectedMonth` mudar
+useEffect(() => {
+  const fetchRanking = async () => {
+    if (availableMonths.length === 0) return; // espera meses carregarem
+    if (!availableMonths.includes(selectedMonth)) return; // evita mês inválido
+
+    try {
+      setLoading(true);
+      const supabase = createClient();
+      const startOfMonth = new Date(new Date().getFullYear(), selectedMonth, 1);
+      const endOfMonth = new Date(new Date().getFullYear(), selectedMonth + 1, 0);
+
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('affiliate_id, total_amount')
+        .eq('status', 'delivered')
+        .gte('created_at', startOfMonth.toISOString())
+        .lte('created_at', endOfMonth.toISOString());
+
+      if (!orders || orders.length === 0) {
+        setRanking([]);
+        setRecordePessoal(0);
+        setMaiorVenda(1);
+        return;
       }
-    };
-  
-    fetchRanking();
-  }, [user?.id, selectedMonth, availableMonths]);
+
+      const salesByAffiliate: Record<string, number> = {};
+      orders.forEach((o) => {
+        if (!salesByAffiliate[o.affiliate_id]) salesByAffiliate[o.affiliate_id] = 0;
+        salesByAffiliate[o.affiliate_id] += o.total_amount || 0;
+      });
+
+      const topAffiliates = Object.entries(salesByAffiliate)
+        .map(([id, total]) => ({ id, total }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5);
+
+      const enriched = await Promise.all(
+        topAffiliates.map(async (item) => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', item.id)
+            .single();
+          return {
+            name: profile?.full_name || 'Afiliado',
+            total: item.total,
+            isCurrentUser: item.id === user?.id,
+          };
+        })
+      );
+
+      setRanking(enriched);
+      const currentUser = enriched.find((r) => r.isCurrentUser);
+      setRecordePessoal(currentUser?.total || 0);
+
+      const maior = Math.max(...enriched.map((r) => r.total), 1);
+      setMaiorVenda(maior);
+    } catch (err) {
+      console.error('Erro no ranking:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchRanking();
+}, [user?.id, selectedMonth, availableMonths]);
 
   return (
     <ScrollView style={styles.container}>
