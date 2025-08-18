@@ -24,103 +24,105 @@ export default function AffiliateDashboard() {
   const [history, setHistory] = useState([]);
 
   // Buscar meses disponíveis
-  useEffect(() => {
-    const fetchAvailableMonths = async () => {
-      if (!user?.id) return;
-  
-      try {
-        const supabase = createClient();
-  
-        const startOfYear = new Date(new Date().getFullYear(), 0, 1);
-  
-        const { data: orders } = await supabase
-          .from('orders')
-          .select('created_at')
-          .eq('affiliate_id', user.id)
-          .eq('status', 'delivered')
-          .gte('created_at', startOfYear.toISOString());
-  
-        if (!orders) return;
-  
-        // Extrai os meses com vendas
-        const months = Array.from(
-          new Set(orders.map((o: any) => new Date(o.created_at).getMonth()))
-        ).sort((a, b) => a - b);
-  
-        setAvailableMonths(months);
-  
-        // Seleciona o primeiro mês disponível caso o mês atual não tenha venda
-        if (!months.includes(selectedMonth)) {
-          setSelectedMonth(months[0] || new Date().getMonth());
-        }
-      } catch (err) {
-        console.error('Erro ao buscar meses:', err);
+  // 1) Buscar meses disponíveis
+useEffect(() => {
+  const fetchAvailableMonths = async () => {
+    if (!user?.id) return;
+
+    try {
+      const supabase = createClient();
+      const startOfYear = new Date(new Date().getFullYear(), 0, 1);
+
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('created_at')
+        .eq('affiliate_id', user.id)
+        .eq('status', 'delivered')
+        .gte('created_at', startOfYear.toISOString());
+
+      if (!orders) return;
+
+      const months = Array.from(
+        new Set(orders.map((o: any) => new Date(o.created_at).getMonth()))
+      ).sort((a, b) => a - b);
+
+      setAvailableMonths(months);
+
+      // Seleciona o primeiro mês disponível caso o mês atual não tenha venda
+      if (!months.includes(selectedMonth)) {
+        setSelectedMonth(months[0] || new Date().getMonth());
       }
-    };
-  
-    fetchAvailableMonths();
-  }, [user?.id]);
+    } catch (err) {
+      console.error('Erro ao buscar meses:', err);
+    }
+  };
 
-  // Buscar dados do mês selecionado
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!user?.id) return;
-      try {
-        setLoading(true);
-        const supabase = createClient();
+  fetchAvailableMonths();
+}, [user?.id]);
 
-        const startOfMonth = new Date(new Date().getFullYear(), selectedMonth, 1);
-        const endOfMonth = new Date(new Date().getFullYear(), selectedMonth + 1, 0);
+// 2) Buscar dados do mês selecionado apenas quando meses estiverem disponíveis
+useEffect(() => {
+  const fetchData = async () => {
+    if (!user?.id) return;
+    if (availableMonths.length === 0) return; // espera meses carregarem
+    if (!availableMonths.includes(selectedMonth)) return; // evita mês inválido
 
-        // pedidos
-        const { data: orders } = await supabase
-          .from('orders')
-          .select('total_amount, created_at')
-          .eq('affiliate_id', user?.id)
-          .gte('created_at', startOfMonth.toISOString())
-          .lte('created_at', endOfMonth.toISOString())
-          .eq('status', 'delivered');
+    try {
+      setLoading(true);
+      const supabase = createClient();
 
-        const totalSales = orders?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
-        const totalOrders = orders?.length || 0;
+      const startOfMonth = new Date(new Date().getFullYear(), selectedMonth, 1);
+      const endOfMonth = new Date(new Date().getFullYear(), selectedMonth + 1, 0);
 
-        // comissões
-        const { data: commissions } = await supabase
-          .from('commissions')
-          .select('amount, status, created_at, product_name, percentage')
-          .eq('affiliate_id', user?.id)
-          .gte('created_at', startOfMonth.toISOString())
-          .lte('created_at', endOfMonth.toISOString());
+      // pedidos
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('total_amount, created_at')
+        .eq('affiliate_id', user?.id)
+        .gte('created_at', startOfMonth.toISOString())
+        .lte('created_at', endOfMonth.toISOString())
+        .eq('status', 'delivered');
 
-        let totalCommission = 0;
-        let paidCommission = 0;
-        let pendingCommission = 0;
+      const totalSales = orders?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
+      const totalOrders = orders?.length || 0;
 
-        commissions?.forEach((c) => {
-          totalCommission += c.amount || 0;
-          if (c.status === 'paga') paidCommission += c.amount || 0;
-          if (c.status === 'pendente') pendingCommission += c.amount || 0;
-        });
+      // comissões
+      const { data: commissions } = await supabase
+        .from('commissions')
+        .select('amount, status, created_at, product_name, percentage')
+        .eq('affiliate_id', user?.id)
+        .gte('created_at', startOfMonth.toISOString())
+        .lte('created_at', endOfMonth.toISOString());
 
-        setStats({
-          totalSales,
-          totalOrders,
-          totalCommission,
-          paidCommission,
-          pendingCommission,
-          goal: 1000,
-        });
+      let totalCommission = 0;
+      let paidCommission = 0;
+      let pendingCommission = 0;
 
-        setHistory(commissions || []);
-      } catch (err) {
-        console.error('Erro no dashboard individual:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      commissions?.forEach((c) => {
+        totalCommission += c.amount || 0;
+        if (c.status === 'paga') paidCommission += c.amount || 0;
+        if (c.status === 'pendente') pendingCommission += c.amount || 0;
+      });
 
-    fetchData();
-  }, [selectedMonth, user?.id]);
+      setStats({
+        totalSales,
+        totalOrders,
+        totalCommission,
+        paidCommission,
+        pendingCommission,
+        goal: 1000,
+      });
+
+      setHistory(commissions || []);
+    } catch (err) {
+      console.error('Erro no dashboard individual:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchData();
+}, [selectedMonth, user?.id, availableMonths]);
 
   const progress = Math.min(stats.totalCommission / stats.goal, 1);
 
