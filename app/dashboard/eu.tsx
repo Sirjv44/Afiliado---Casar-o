@@ -26,26 +26,30 @@ export default function AffiliateDashboard() {
   // Buscar meses disponíveis
   useEffect(() => {
     const fetchAvailableMonths = async () => {
+      if (!user?.id) return;
+  
       try {
         const supabase = createClient();
-
+  
         const startOfYear = new Date(new Date().getFullYear(), 0, 1);
-
+  
         const { data: orders } = await supabase
           .from('orders')
           .select('created_at')
-          .eq('affiliate_id', user?.id)
+          .eq('affiliate_id', user.id)
           .eq('status', 'delivered')
           .gte('created_at', startOfYear.toISOString());
-
+  
         if (!orders) return;
-
-        const months = Array.from(new Set(
-          orders.map((o: any) => new Date(o.created_at).getMonth())
-        )).sort((a, b) => a - b);
-
+  
+        // Extrai os meses com vendas
+        const months = Array.from(
+          new Set(orders.map((o: any) => new Date(o.created_at).getMonth()))
+        ).sort((a, b) => a - b);
+  
         setAvailableMonths(months);
-
+  
+        // Seleciona o primeiro mês disponível caso o mês atual não tenha venda
         if (!months.includes(selectedMonth)) {
           setSelectedMonth(months[0] || new Date().getMonth());
         }
@@ -53,7 +57,7 @@ export default function AffiliateDashboard() {
         console.error('Erro ao buscar meses:', err);
       }
     };
-
+  
     fetchAvailableMonths();
   }, [user?.id]);
 
@@ -138,7 +142,6 @@ export default function AffiliateDashboard() {
           />
         ))}
       </Picker>
-
       <Text style={styles.highlightText}>
         R$ {stats.totalCommission.toFixed(2)} em{' '}
         {new Date(0, selectedMonth).toLocaleString('pt-BR', { month: 'long' })}.
