@@ -22,7 +22,8 @@ export default function GamificacaoScreen() {
 
   useEffect(() => {
     const fetchRanking = async () => {
-      if (selectedMonth === null) return; // evita rodar antes do carregamento dos meses
+      if (availableMonths.length === 0) return; // espera meses carregarem
+  
       try {
         setLoading(true);
         const supabase = createClient();
@@ -32,7 +33,7 @@ export default function GamificacaoScreen() {
   
         const { data: orders } = await supabase
           .from('orders')
-          .select('affiliate_id, total_amount, created_at')
+          .select('affiliate_id, total_amount')
           .eq('status', 'delivered')
           .gte('created_at', startOfMonth.toISOString())
           .lte('created_at', endOfMonth.toISOString());
@@ -45,7 +46,6 @@ export default function GamificacaoScreen() {
         }
   
         const salesByAffiliate: Record<string, number> = {};
-  
         orders.forEach((o) => {
           if (!salesByAffiliate[o.affiliate_id]) salesByAffiliate[o.affiliate_id] = 0;
           salesByAffiliate[o.affiliate_id] += o.total_amount || 0;
@@ -72,7 +72,6 @@ export default function GamificacaoScreen() {
         );
   
         setRanking(enriched);
-  
         const currentUser = enriched.find((r) => r.isCurrentUser);
         setRecordePessoal(currentUser?.total || 0);
   
@@ -86,7 +85,7 @@ export default function GamificacaoScreen() {
     };
   
     fetchRanking();
-  }, [selectedMonth, user?.id]);
+  }, [user?.id, selectedMonth, availableMonths]);
 
   return (
     <ScrollView style={styles.container}>
