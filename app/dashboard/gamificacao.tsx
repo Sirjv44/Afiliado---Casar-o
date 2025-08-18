@@ -55,8 +55,7 @@ useEffect(() => {
 useEffect(() => {
   const fetchRanking = async () => {
     if (availableMonths.length === 0) return; // espera meses carregarem
-    if (!availableMonths.includes(selectedMonth)) return; // evita mês inválido
-
+    // remove a checagem do includes
     try {
       setLoading(true);
       const supabase = createClient();
@@ -117,7 +116,7 @@ useEffect(() => {
   };
 
   fetchRanking();
-}, [user?.id, selectedMonth, availableMonths]);
+}, [user?.id, selectedMonth, availableMonths]); // continua disparando ao mudar mês
 
   return (
     <ScrollView style={styles.container}>
