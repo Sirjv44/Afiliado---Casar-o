@@ -65,8 +65,7 @@ useEffect(() => {
   const fetchData = async () => {
     if (!user?.id) return;
     if (availableMonths.length === 0) return; // espera meses carregarem
-    if (!availableMonths.includes(selectedMonth)) return; // evita mês inválido
-
+    // remove a checagem do includes para permitir troca de mês
     try {
       setLoading(true);
       const supabase = createClient();
@@ -122,7 +121,7 @@ useEffect(() => {
   };
 
   fetchData();
-}, [selectedMonth, user?.id, availableMonths]);
+}, [selectedMonth, user?.id, availableMonths]); // dispara sempre que mudar mês ou meses disponíveis
 
   const progress = Math.min(stats.totalCommission / stats.goal, 1);
 
