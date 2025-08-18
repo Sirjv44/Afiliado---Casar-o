@@ -302,7 +302,7 @@ export default function DashboardScreen() {
           </>
         )}
 
-      <Text style={styles.sectionTitle}>Promoções da Semana!</Text>
+      <Text style={styles.sectionTitle}>Promoções da Semana! - Arraste para o lado para ver mais!</Text>
 
       {ofertasSemana.length > 0 ? (
         <ScrollView
