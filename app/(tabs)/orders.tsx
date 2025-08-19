@@ -183,12 +183,23 @@ export default function OrdersScreen() {
   return (
     <View style={styles.container}>
       {renderFilterButtons()}
+  
+      {/* 👇 Resumo de quantas vendas tem no filtro atual */}
+      <View style={styles.summaryContainer}>
+        <Text style={styles.summaryText}>
+          {orders.length}{' '}
+          {orders.length === 1 ? 'venda enviada' : `vendas ${statusLabels[activeFilter].toLowerCase()}s`}
+        </Text>
+      </View>
+
+  
       <FlatList
         data={orders}
         renderItem={renderOrderItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.listContainer}
       />
+  
       <TouchableOpacity
         style={styles.fabButton}
         onPress={() => router.push('/order/new')}
@@ -197,6 +208,7 @@ export default function OrdersScreen() {
       </TouchableOpacity>
     </View>
   );
+  
 }
 
 const styles = StyleSheet.create({
@@ -208,6 +220,18 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 80,
   },
+  summaryContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: COLORS.card,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  summaryText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+  },  
   filterContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
