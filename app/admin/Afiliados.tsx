@@ -46,23 +46,48 @@ export default function AffiliatesScreen() {
   useEffect(() => {
     const fetchAffiliates = async () => {
       const supabase = createClient();
-
-      const { data, error } = await supabase
+  
+      // Busca todos os afiliados (exceto admin e usuário atual)
+      const { data: profiles, error } = await supabase
         .from('profiles')
         .select('id, full_name, email, phone, address')
         .eq('admin', false)
         .neq('id', user?.id);
-
+  
       if (error) {
         console.error('Erro ao buscar afiliados:', error.message);
-      } else {
-        setAffiliates(data);
-        setFilteredAffiliates(data); // Inicializa com todos
+        setLoading(false);
+        return;
       }
-
+  
+      // Busca todas as vendas entregues
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('affiliate_id')
+        .eq('status', 'delivered');
+  
+      if (ordersError) {
+        console.error('Erro ao buscar vendas:', ordersError.message);
+      }
+  
+      // Conta quantas vendas cada afiliado fez
+      const salesCount: Record<string, number> = {};
+      orders?.forEach((o) => {
+        if (!salesCount[o.affiliate_id]) salesCount[o.affiliate_id] = 0;
+        salesCount[o.affiliate_id] += 1;
+      });
+  
+      // Junta o número de vendas no objeto de cada afiliado
+      const enriched = profiles.map((a) => ({
+        ...a,
+        totalSales: salesCount[a.id] || 0,
+      }));
+  
+      setAffiliates(enriched);
+      setFilteredAffiliates(enriched);
       setLoading(false);
     };
-
+  
     if (user?.id && isAdmin === true) {
       fetchAffiliates();
     } else if (isAdmin === false) {
@@ -97,38 +122,49 @@ export default function AffiliatesScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Afiliados</Text>
+  <Text style={styles.title}>Afiliados</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Pesquisar por nome..."
-        placeholderTextColor={COLORS.textSecondary}
-        value={searchText}
-        onChangeText={setSearchText}
-      />
+  {/* RESUMO */}
+  <View style={styles.summaryContainer}>
+    <View style={styles.summaryCard}>
+      <Text style={styles.summaryLabel}>Total de Afiliados</Text>
+      <Text style={styles.summaryValue}>{affiliates.length}</Text>
+    </View>
+  </View>
 
-      {filteredAffiliates.length === 0 ? (
-        <Text style={styles.errorText}>Nenhum afiliado encontrado.</Text>
-      ) : (
-        filteredAffiliates.map((affiliate) => (
-          <TouchableOpacity
-            key={affiliate.id}
-            style={styles.card}
-            onPress={() =>
-              router.push({
-                pathname: '/PixQrCode',
-                params: { id: affiliate.id },
-              })
-            }
-          >
-            <Text style={styles.name}>{affiliate.full_name}</Text>
-            <Text style={styles.email}>{affiliate.email}</Text>
-            <Text style={styles.phone}>📞 {affiliate.phone || 'Sem telefone'}</Text>
-            <Text style={styles.address}>📍 {affiliate.address || 'Sem endereço informado'}</Text>
-          </TouchableOpacity>
-        ))
-      )}
-    </ScrollView>
+  {/* Campo de busca */}
+  <TextInput
+    style={styles.input}
+    placeholder="Pesquisar por nome..."
+    placeholderTextColor={COLORS.textSecondary}
+    value={searchText}
+    onChangeText={setSearchText}
+  />
+
+  {/* Lista de afiliados */}
+  {filteredAffiliates.length === 0 ? (
+    <Text style={styles.errorText}>Nenhum afiliado encontrado.</Text>
+  ) : (
+    filteredAffiliates.map((affiliate) => (
+      <TouchableOpacity
+        key={affiliate.id}
+        style={styles.card}
+        onPress={() =>
+          router.push({
+            pathname: '/PixQrCode',
+            params: { id: affiliate.id },
+          })
+        }
+      >
+        <Text style={styles.name}>{affiliate.full_name}</Text>
+        <Text style={styles.email}>{affiliate.email}</Text>
+        <Text style={styles.phone}>📞 {affiliate.phone || 'Sem telefone'}</Text>
+        <Text style={styles.address}>📍 {affiliate.address || 'Sem endereço informado'}</Text>
+        <Text style={styles.sales}>🛒 {affiliate.totalSales} vendas</Text>
+      </TouchableOpacity>
+    ))
+  )}
+</ScrollView>
   );
 }
 
@@ -147,6 +183,35 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
   },
+  sales: {
+    fontSize: 14,
+    color: COLORS.success,
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  summaryContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  summaryCard: {
+    flex: 1,
+    backgroundColor: COLORS.cardAlt,
+    padding: 12,
+    borderRadius: 8,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+  },    
   card: {
     backgroundColor: COLORS.card,
     padding: 16,

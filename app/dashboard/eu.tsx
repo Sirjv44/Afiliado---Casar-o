@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+} from 'react-native';
 import { COLORS } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@/lib/supabase';
@@ -11,8 +17,11 @@ import Badge from '@/components/Badge';
 export default function AffiliateDashboard() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // mês atual
-  const [availableMonths, setAvailableMonths] = useState<number[]>([]);
+  const [filterType, setFilterType] = useState<'month' | 'period' | ''>('');
+  const [selectedMonth, setSelectedMonth] = useState('');
+  const [monthsAvailable, setMonthsAvailable] = useState<string[]>([]);
+  const [periodStart, setPeriodStart] = useState(''); // YYYY-MM-DD
+  const [periodEnd, setPeriodEnd] = useState('');     // YYYY-MM-DD
   const [stats, setStats] = useState({
     totalSales: 0,
     totalOrders: 0,
@@ -23,75 +32,80 @@ export default function AffiliateDashboard() {
   });
   const [history, setHistory] = useState([]);
 
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
   // Buscar meses disponíveis
-  // 1) Buscar meses disponíveis
-useEffect(() => {
-  const fetchAvailableMonths = async () => {
-    if (!user?.id) return;
-
-    try {
+  useEffect(() => {
+    const fetchMonths = async () => {
+      if (!user?.id) return;
       const supabase = createClient();
-      const startOfYear = new Date(new Date().getFullYear(), 0, 1);
-
-      const { data: orders } = await supabase
+      const { data, error } = await supabase
         .from('orders')
         .select('created_at')
         .eq('affiliate_id', user.id)
-        .eq('status', 'delivered')
-        .gte('created_at', startOfYear.toISOString());
+        .eq('status', 'delivered');
+      if (error) return console.error(error);
 
-      if (!orders) return;
+      const monthsSet = new Set<string>();
+      data?.forEach((o) => {
+        if (o.created_at) {
+          const d = new Date(o.created_at);
+          monthsSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+        }
+      });
+      const monthsArr = Array.from(monthsSet).sort((a, b) => (a > b ? -1 : 1));
+      setMonthsAvailable(monthsArr);
+      setSelectedMonth(monthsArr[0] || '');
+    };
+    fetchMonths();
+  }, [user?.id]);
 
-      const months = Array.from(
-        new Set(orders.map((o: any) => new Date(o.created_at).getMonth()))
-      ).sort((a, b) => a - b);
-
-      setAvailableMonths(months);
-
-      // Seleciona o primeiro mês disponível caso o mês atual não tenha venda
-      if (!months.includes(selectedMonth)) {
-        setSelectedMonth(months[0] || new Date().getMonth());
-      }
-    } catch (err) {
-      console.error('Erro ao buscar meses:', err);
-    }
-  };
-
-  fetchAvailableMonths();
-}, [user?.id]);
-
-// 2) Buscar dados do mês selecionado apenas quando meses estiverem disponíveis
-useEffect(() => {
   const fetchData = async () => {
     if (!user?.id) return;
-    if (availableMonths.length === 0) return; // espera meses carregarem
-    // remove a checagem do includes para permitir troca de mês
+    setLoading(true);
     try {
-      setLoading(true);
       const supabase = createClient();
+      let startDate: Date;
+      let endDate: Date;
 
-      const startOfMonth = new Date(new Date().getFullYear(), selectedMonth, 1);
-      const endOfMonth = new Date(new Date().getFullYear(), selectedMonth + 1, 0);
+      if (filterType === 'month' && selectedMonth) {
+        const [year, month] = selectedMonth.split('-').map(Number);
+        startDate = new Date(year, month - 1, 1);
+        endDate = new Date(year, month, 0, 23, 59, 59);
+      } else if (filterType === 'period' && periodStart && periodEnd) {
+        startDate = new Date(periodStart);
+        endDate = new Date(periodEnd + 'T23:59:59');
+      } else {
+        startDate = new Date(0);
+        endDate = new Date();
+      }
 
-      // pedidos
+      // Pedidos
       const { data: orders } = await supabase
         .from('orders')
         .select('total_amount, created_at')
-        .eq('affiliate_id', user?.id)
-        .gte('created_at', startOfMonth.toISOString())
-        .lte('created_at', endOfMonth.toISOString())
-        .eq('status', 'delivered');
+        .eq('affiliate_id', user.id)
+        .eq('status', 'delivered')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
 
       const totalSales = orders?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
       const totalOrders = orders?.length || 0;
 
-      // comissões
+      // Comissões
       const { data: commissions } = await supabase
         .from('commissions')
         .select('amount, status, created_at, product_name, percentage')
-        .eq('affiliate_id', user?.id)
-        .gte('created_at', startOfMonth.toISOString())
-        .lte('created_at', endOfMonth.toISOString());
+        .eq('affiliate_id', user.id)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
 
       let totalCommission = 0;
       let paidCommission = 0;
@@ -111,88 +125,115 @@ useEffect(() => {
         pendingCommission,
         goal: 1000,
       });
-
       setHistory(commissions || []);
     } catch (err) {
-      console.error('Erro no dashboard individual:', err);
+      console.error('Erro no dashboard affiliate:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  fetchData();
-}, [selectedMonth, user?.id, availableMonths]); // dispara sempre que mudar mês ou meses disponíveis
-
-  const progress = Math.min(stats.totalCommission / stats.goal, 1);
-
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.sectionTitle}>Selecione o mês</Text>
-      <Picker
-        selectedValue={selectedMonth}
-        onValueChange={(value) => setSelectedMonth(value)}
-        style={[styles.picker, { color: 'white' }]}
-        dropdownIconColor="white"
-      >
-        {availableMonths.map((i) => (
-          <Picker.Item
-            key={i}
-            label={new Date(0, i).toLocaleString('pt-BR', { month: 'long' })}
-            value={i}
-            color="white"
-          />
-        ))}
-      </Picker>
-      <Text style={styles.highlightText}>
-        R$ {stats.totalCommission.toFixed(2)} em{' '}
-        {new Date(0, selectedMonth).toLocaleString('pt-BR', { month: 'long' })}.
-      </Text>
+      <Text style={styles.sectionTitle}>Filtros</Text>
 
-      <View style={styles.statsContainer}>
-        <StatusCard
-          title="Total de Vendas"
-          value={`R$ ${stats.totalSales.toFixed(2)}`}
-          subtitle={`${stats.totalOrders} pedidos`}
-          color={COLORS.cardAlt}
-        />
-        <StatusCard
-          title="Comissão Paga"
-          value={`R$ ${stats.paidCommission.toFixed(2)}`}
-          subtitle="Já recebido"
-          color={COLORS.success}
-        />
-        <StatusCard
-          title="Comissão Pendente"
-          value={`R$ ${stats.pendingCommission.toFixed(2)}`}
-          subtitle="Aguardando pagamento"
-          color={COLORS.warning}
-        />
+      {/* Tipo de filtro */}
+      <View style={{ marginBottom: 16 }}>
+        <Text style={styles.filterLabel}>Escolha o tipo de filtro:</Text>
+        <select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value as 'month' | 'period' | '')}
+          style={styles.select}
+        >
+          <option value="">Selecione</option>
+          <option value="month">Por Mês</option>
+          <option value="period">Por Período</option>
+        </select>
       </View>
 
+      {/* Filtro mês */}
+      {filterType === 'month' && (
+        <View style={{ marginBottom: 16 }}>  {/* <--- adiciona espaço abaixo */}
+          <Text style={styles.filterLabel}>Selecione o Mês:</Text>
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            style={styles.select}
+          >
+            <option value="">Todos</option>
+            {monthsAvailable.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </View>
+      )}
+
+      {/* Filtro período */}
+      {filterType === 'period' && (
+        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}> {/* <--- espaço */}
+          <View>
+            <Text style={styles.filterLabel}>Data Início:</Text>
+            <input
+              type="date"
+              value={periodStart}
+              onChange={(e) => setPeriodStart(e.target.value)}
+              style={styles.dateInput}
+            />
+          </View>
+          <View>
+            <Text style={styles.filterLabel}>Data Fim:</Text>
+            <input
+              type="date"
+              value={periodEnd}
+              onChange={(e) => setPeriodEnd(e.target.value)}
+              style={styles.dateInput}
+            />
+          </View>
+        </View>
+      )}
+
+
+      <TouchableOpacity style={styles.applyButton} onPress={fetchData}>
+        <Text style={styles.applyButtonText}>Aplicar Filtro</Text>
+      </TouchableOpacity>
+
+      <Text style={styles.highlightText}>
+        {filterType === 'month'
+          ? `R$ ${stats.totalCommission.toFixed(2)} em ${selectedMonth}`
+          : filterType === 'period'
+          ? `R$ ${stats.totalCommission.toFixed(2)} de ${periodStart} até ${periodEnd}`
+          : `R$ ${stats.totalCommission.toFixed(2)} este ano`}
+      </Text>
+
+      {/* Cards de estatísticas */}
+      <View style={styles.statsContainer}>
+        <StatusCard title="Total de Vendas" value={`R$ ${stats.totalSales.toFixed(2)}`} subtitle={`${stats.totalOrders} pedidos`} color={COLORS.cardAlt} />
+        <StatusCard title="Comissão Paga" value={`R$ ${stats.paidCommission.toFixed(2)}`} subtitle="Já recebido" color={COLORS.success} />
+        <StatusCard title="Comissão Pendente" value={`R$ ${stats.pendingCommission.toFixed(2)}`} subtitle="Aguardando pagamento" color={COLORS.warning} />
+      </View>
+
+      {/* Meta mensal */}
       <Text style={styles.sectionTitle}>Meta Mensal</Text>
       <ProgressBar
-        progress={progress}
+        progress={Math.min(stats.totalCommission / stats.goal, 1)}
         label={`R$ ${stats.totalCommission.toFixed(2)} / R$ ${stats.goal}`}
       />
 
+      {/* Histórico */}
       <Text style={styles.sectionTitle}>Histórico</Text>
       {history.map((item, index) => (
         <View key={index} style={styles.historyItem}>
           <View style={{ flex: 1 }}>
             <Text style={styles.productName}>{item.product_name}</Text>
-            <Text style={styles.dateText}>
-              {new Date(item.created_at).toLocaleDateString()}
-            </Text>
-            <Text style={styles.valueText}>
-              Comissão: R$ {item.amount.toFixed(2)} ({item.percentage}%)
-            </Text>
+            <Text style={styles.dateText}>{formatDate(item.created_at)}</Text>
+            <Text style={styles.valueText}>Comissão: R$ {item.amount.toFixed(2)} ({item.percentage}%)</Text>
           </View>
           <Badge status={item.status} />
         </View>
       ))}
 
       {!loading && history.length === 0 && (
-        <Text style={styles.empty}>Nenhuma venda registrada neste mês.</Text>
+        <Text style={styles.empty}>Nenhuma venda registrada neste período.</Text>
       )}
     </ScrollView>
   );
@@ -200,17 +241,19 @@ useEffect(() => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background, padding: 16 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
-  loadingText: { marginTop: 16, fontSize: 16, color: COLORS.textSecondary },
-  picker: {
-    backgroundColor: COLORS.card,
-    marginBottom: 20,
-  },  
-  highlightText: { fontSize: 16, fontWeight: '600', marginBottom: 20, color: COLORS.text },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: COLORS.text, marginTop: 20, marginBottom: 12 },
   statsContainer: { marginBottom: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: COLORS.text, marginBottom: 12 },
   historyItem: { backgroundColor: COLORS.card, padding: 12, borderRadius: 8, marginBottom: 10, flexDirection: 'row', alignItems: 'center' },
   productName: { fontSize: 16, fontWeight: '600', color: COLORS.text },
   dateText: { fontSize: 12, color: COLORS.textSecondary },
   valueText: { fontSize: 14, color: COLORS.text },
+  highlightText: { fontSize: 16, fontWeight: '600', marginBottom: 20, color: COLORS.text },
+  empty: { textAlign: 'center', color: COLORS.textSecondary, marginTop: 40 },
+
+  // Filtros
+  filterLabel: { fontSize: 14, fontWeight: '500', color: COLORS.text, marginBottom: 4 },
+  select: { padding: 8, borderRadius: 8, border: `1px solid ${COLORS.border}`, backgroundColor: COLORS.card, color: COLORS.text, width: 200 },
+  dateInput: { padding: 8, borderRadius: 8, border: `1px solid ${COLORS.border}`, backgroundColor: COLORS.card, color: COLORS.text },
+  applyButton: { backgroundColor: COLORS.primary, padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 8, marginBottom: 16 },
+  applyButtonText: { color: 'white', fontWeight: '600', fontSize: 16 },
 });

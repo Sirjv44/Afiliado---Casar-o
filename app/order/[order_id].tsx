@@ -20,6 +20,7 @@ export default function OrderDetailScreen() {
     notes: '',
     client_phone: '',
     affiliate_name: '',
+    affiliate_phone: '',
   });
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
@@ -64,7 +65,7 @@ export default function OrderDetailScreen() {
       // Buscar dados do pedido + afiliado
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
-        .select('client_address, notes, client_phone, profiles(full_name)')
+        .select('client_address, notes, client_phone, profiles(full_name, phone)')
         .eq('id', order_id)
         .single();
 
@@ -76,6 +77,7 @@ export default function OrderDetailScreen() {
           notes: orderData.notes,
           client_phone: orderData.client_phone,
           affiliate_name: orderData.profiles?.full_name || '',
+          affiliate_phone: orderData.profiles?.phone || '',
         });
       }
 
@@ -141,9 +143,12 @@ export default function OrderDetailScreen() {
         {isAdmin && orderInfo.affiliate_name && (
           <>
             <Text style={styles.infoLabel}>Afiliado:</Text>
-            <Text style={styles.infoText}>{orderInfo.affiliate_name}</Text>
+            <Text style={styles.infoText}>
+              {orderInfo.affiliate_name} ({orderInfo.affiliate_phone || 'Sem telefone'})
+            </Text>
           </>
         )}
+
 
         {isAdmin && commissionStatus && (
           <>

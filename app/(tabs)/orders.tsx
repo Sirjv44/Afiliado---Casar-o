@@ -79,17 +79,26 @@ export default function OrdersScreen() {
         itemCounts[orderId] = (itemCounts[orderId] ?? 0) + (item.quantity ?? 0);
       });
 
-      const transformed = ordersData.map((order) => ({
-        id: order.id,
-        clientName: order.client_name ?? 'Cliente não informado',
-        date: order.created_at
-          ? new Date(order.created_at).toLocaleDateString('pt-BR')
-          : '',
-        totalAmount: typeof order.total_amount === 'number' ? order.total_amount : 0,
-        status: order.status,
-        items: itemCounts[order.id] ?? 0,
-        affiliateName: order.profiles?.full_name ?? '',
-      }));
+      const transformed = ordersData.map((order) => {
+        let formattedDate = '';
+        if (order.created_at) {
+          const date = new Date(order.created_at);
+          formattedDate = `${date.toLocaleDateString('pt-BR')} ${date.toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}`;
+        }
+      
+        return {
+          id: order.id,
+          clientName: order.client_name ?? 'Cliente não informado',
+          date: formattedDate, // 👈 agora tem data e hora
+          totalAmount: typeof order.total_amount === 'number' ? order.total_amount : 0,
+          status: order.status,
+          items: itemCounts[order.id] ?? 0,
+          affiliateName: order.profiles?.full_name ?? '',
+        };
+      });
 
       setOrders(transformed);
     } catch (error) {
