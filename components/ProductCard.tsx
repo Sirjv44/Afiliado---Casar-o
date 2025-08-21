@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ToastAndroid, Platform } from 'react-native';
 import { COLORS } from '@/constants/Colors';
-import { ShoppingCart, Bookmark, BookmarkCheck } from 'lucide-react-native';
+import { ShoppingCart, Bookmark, BookmarkCheck, Plus, Minus } from 'lucide-react-native'; // Adicionando ícones
 import { createClient } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 
@@ -13,7 +13,7 @@ export interface Product {
   description: string | null;
   category: string;
   image_url: string;
-  commission_percentage?: number | null; // adicionando o campo da tabela
+  commission_percentage?: number | null;
 }
 
 interface ProductCardProps {
@@ -27,34 +27,27 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoadingFavorite, setIsLoadingFavorite] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [currentStock, setCurrentStock] = useState(product.stock); // Estado local do estoque
 
   const descriptionLimit = 100;
 
   const highCommissionKeywords = ['tribulus', 'maca peruana', 'provitalis', 'cindura', 'ioimbina', 'viper'];
 
-  // cálculo da comissão
-  // cálculo da comissão (mantendo sua regra)
-const commissionRate = useMemo(() => {
-  const name = product.name.toLowerCase();
-  const isHighCommission = highCommissionKeywords.some(
-    (keyword) => name.startsWith(keyword) || name.includes(keyword)
-  );
+  const commissionRate = useMemo(() => {
+    const name = product.name.toLowerCase();
+    const isHighCommission = highCommissionKeywords.some(
+      (keyword) => name.startsWith(keyword) || name.includes(keyword)
+    );
 
-  const isValidPercentage =
-    typeof product.commission_percentage === 'number' && !isNaN(product.commission_percentage);
+    const isValidPercentage =
+      typeof product.commission_percentage === 'number' && !isNaN(product.commission_percentage);
 
-  return isValidPercentage
-    ? product.commission_percentage
-    : isHighCommission
-    ? 0.4
-    : 0.20;
-}, [product]);
+    return isValidPercentage ? product.commission_percentage : isHighCommission ? 0.4 : 0.2;
+  }, [product]);
 
-// valor da comissão em reais
-const commissionValue = useMemo(() => {
-  return product.price * commissionRate;
-}, [product.price, commissionRate]);
-
+  const commissionValue = useMemo(() => {
+    return product.price * commissionRate;
+  }, [product.price, commissionRate]);
 
   useEffect(() => {
     const checkFavorite = async () => {
@@ -128,21 +121,47 @@ const commissionValue = useMemo(() => {
     }
   };
 
+  // ✅ Função para atualizar estoque no Supabase
+  const updateStock = async (newStock: number) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('products')
+      .update({ stock: newStock })
+      .eq('id', product.id);
+
+    if (!error) {
+      setCurrentStock(newStock);
+      showToast('Estoque atualizado');
+    } else {
+      console.error('Erro ao atualizar estoque:', error.message);
+      showToast('Erro ao atualizar estoque');
+    }
+  };
+
+  const increaseStock = () => {
+    const newStock = currentStock + 1;
+    updateStock(newStock);
+  };
+
+  const decreaseStock = () => {
+    if (currentStock > 0) {
+      const newStock = currentStock - 1;
+      updateStock(newStock);
+    }
+  };
+
   return (
     <TouchableOpacity style={styles.card} onPress={() => onViewDetails(product)} activeOpacity={0.9}>
       <Image source={{ uri: product.image_url }} style={styles.image} />
 
-      {/* Badge de categoria */}
       <View style={styles.categoryBadge}>
         <Text style={styles.categoryText}>{product.category}</Text>
       </View>
 
-      {/* Badge da comissão */}
       <View style={styles.commissionBadge}>
-      <Text style={styles.commissionText}>
-        Comissão R$ {commissionValue.toFixed(2)}
-      </Text>
-
+        <Text style={styles.commissionText}>
+          Comissão R$ {commissionValue.toFixed(2)}
+        </Text>
       </View>
 
       <View style={styles.contentContainer}>
@@ -150,7 +169,20 @@ const commissionValue = useMemo(() => {
 
         <View style={styles.priceRow}>
           <Text style={styles.price}>R$ {product.price.toFixed(2)}</Text>
-          <Text style={styles.stock}>{product.stock} em estoque</Text>
+          
+          {user?.admin ? (
+            <View style={styles.adminStockContainer}>
+              <TouchableOpacity onPress={decreaseStock} style={styles.stockButton}>
+                <Minus size={16} color="#fff" />
+              </TouchableOpacity>
+              <Text style={styles.stockText}>{currentStock}</Text>
+              <TouchableOpacity onPress={increaseStock} style={styles.stockButton}>
+                <Plus size={16} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <Text style={styles.stock}>{currentStock} em estoque</Text>
+          )}
         </View>
 
         {product.description && (
@@ -166,20 +198,22 @@ const commissionValue = useMemo(() => {
           </>
         )}
 
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.addButton} onPress={() => onAddToCart(product)}>
-            <ShoppingCart size={16} color="#FFFFFF" />
-            <Text style={styles.buttonText}>Adicionar</Text>
-          </TouchableOpacity>
+        {!user?.admin && (
+          <View style={styles.actions}>
+            <TouchableOpacity style={styles.addButton} onPress={() => onAddToCart(product)}>
+              <ShoppingCart size={16} color="#FFFFFF" />
+              <Text style={styles.buttonText}>Adicionar</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.saveButton} onPress={toggleFavorite} disabled={isLoadingFavorite}>
-            {isFavorite ? (
-              <BookmarkCheck size={18} color={COLORS.primary} />
-            ) : (
-              <Bookmark size={18} color={COLORS.primary} />
-            )}
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity style={styles.saveButton} onPress={toggleFavorite} disabled={isLoadingFavorite}>
+              {isFavorite ? (
+                <BookmarkCheck size={18} color={COLORS.primary} />
+              ) : (
+                <Bookmark size={18} color={COLORS.primary} />
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -244,6 +278,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
+  },
+  adminStockContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stockButton: {
+    backgroundColor: COLORS.primary,
+    padding: 6,
+    borderRadius: 6,
+    marginHorizontal: 4,
+  },
+  stockText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    marginHorizontal: 6,
   },
   price: {
     fontSize: 18,
