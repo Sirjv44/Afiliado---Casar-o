@@ -1,7 +1,16 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ToastAndroid, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  ToastAndroid,
+  Platform,
+  TextInput,
+} from 'react-native';
 import { COLORS } from '@/constants/Colors';
-import { ShoppingCart, Bookmark, BookmarkCheck, Plus, Minus } from 'lucide-react-native'; // Adicionando ícones
+import { ShoppingCart, Bookmark, BookmarkCheck, Plus, Minus } from 'lucide-react-native';
 import { createClient } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 
@@ -28,9 +37,10 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
   const [isLoadingFavorite, setIsLoadingFavorite] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [currentStock, setCurrentStock] = useState(product.stock); // Estado local do estoque
+  const [inputStock, setInputStock] = useState(product.stock.toString()); // Para input manual
+  const [isUpdatingStock, setIsUpdatingStock] = useState(false);
 
   const descriptionLimit = 100;
-
   const highCommissionKeywords = ['tribulus', 'maca peruana', 'provitalis', 'cindura', 'ioimbina', 'viper'];
 
   const commissionRate = useMemo(() => {
@@ -38,16 +48,12 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
     const isHighCommission = highCommissionKeywords.some(
       (keyword) => name.startsWith(keyword) || name.includes(keyword)
     );
-
     const isValidPercentage =
       typeof product.commission_percentage === 'number' && !isNaN(product.commission_percentage);
-
     return isValidPercentage ? product.commission_percentage : isHighCommission ? 0.4 : 0.2;
   }, [product]);
 
-  const commissionValue = useMemo(() => {
-    return product.price * commissionRate;
-  }, [product.price, commissionRate]);
+  const commissionValue = useMemo(() => product.price * commissionRate, [product.price, commissionRate]);
 
   useEffect(() => {
     const checkFavorite = async () => {
@@ -60,22 +66,15 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
         .eq('product_id', product.id)
         .maybeSingle();
 
-      if (!error && data) {
-        setIsFavorite(true);
-      } else {
-        setIsFavorite(false);
-      }
+      if (!error && data) setIsFavorite(true);
+      else setIsFavorite(false);
     };
-
     checkFavorite();
   }, [product.id, user?.id]);
 
   const showToast = (message: string) => {
-    if (Platform.OS === 'android') {
-      ToastAndroid.show(message, ToastAndroid.SHORT);
-    } else {
-      alert(message);
-    }
+    if (Platform.OS === 'android') ToastAndroid.show(message, ToastAndroid.SHORT);
+    else alert(message);
   };
 
   const toggleFavorite = async () => {
@@ -88,70 +87,54 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
         affiliated_id: user.id,
         product_id: product.id,
       });
-
       if (!error) {
         setIsFavorite(true);
         showToast('Adicionado aos favoritos');
-      } else {
-        console.error('Erro ao favoritar:', error.message);
-      }
+      } else console.error('Erro ao favoritar:', error.message);
     } else {
       const { error } = await supabase
         .from('favorites')
         .delete()
         .match({ affiliated_id: user.id, product_id: product.id });
-
       if (!error) {
         setIsFavorite(false);
         showToast('Removido dos favoritos');
-      } else {
-        console.error('Erro ao desfavoritar:', error.message);
-      }
+      } else console.error('Erro ao desfavoritar:', error.message);
     }
     setIsLoadingFavorite(false);
   };
 
   const getDescriptionText = () => {
     const description = product.description ?? '';
-
-    if (showFullDescription || description.length <= descriptionLimit) {
-      return description;
-    } else {
-      return description.substring(0, descriptionLimit) + '...';
-    }
+    if (showFullDescription || description.length <= descriptionLimit) return description;
+    else return description.substring(0, descriptionLimit) + '...';
   };
 
-  // ✅ Função para atualizar estoque no Supabase
   const updateStock = async (newStock: number) => {
+    setIsUpdatingStock(true);
     const supabase = createClient();
-    const { error } = await supabase
-      .from('products')
-      .update({ stock: newStock })
-      .eq('id', product.id);
-
+    const { error } = await supabase.from('products').update({ stock: newStock }).eq('id', product.id);
     if (!error) {
       setCurrentStock(newStock);
+      setInputStock(newStock.toString());
       showToast('Estoque atualizado');
     } else {
       console.error('Erro ao atualizar estoque:', error.message);
       showToast('Erro ao atualizar estoque');
     }
+    setIsUpdatingStock(false);
   };
 
-  const increaseStock = () => {
-    const newStock = currentStock + 1;
-    updateStock(newStock);
-  };
-
-  const decreaseStock = () => {
-    if (currentStock > 0) {
-      const newStock = currentStock - 1;
-      updateStock(newStock);
-    }
+  const increaseStock = () => updateStock(currentStock + 1);
+  const decreaseStock = () => currentStock > 0 && updateStock(currentStock - 1);
+  const saveInputStock = () => {
+    const newStock = parseInt(inputStock);
+    if (!isNaN(newStock) && newStock >= 0) updateStock(newStock);
+    else showToast('Digite um número válido');
   };
 
   return (
-    <TouchableOpacity style={styles.card} onPress={() => onViewDetails(product)} activeOpacity={0.9}>
+    <View>
       <Image source={{ uri: product.image_url }} style={styles.image} />
 
       <View style={styles.categoryBadge}>
@@ -159,9 +142,7 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
       </View>
 
       <View style={styles.commissionBadge}>
-        <Text style={styles.commissionText}>
-          Comissão R$ {commissionValue.toFixed(2)}
-        </Text>
+        <Text style={styles.commissionText}>Comissão R$ {commissionValue.toFixed(2)}</Text>
       </View>
 
       <View style={styles.contentContainer}>
@@ -169,15 +150,26 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
 
         <View style={styles.priceRow}>
           <Text style={styles.price}>R$ {product.price.toFixed(2)}</Text>
-          
+
           {user?.admin ? (
             <View style={styles.adminStockContainer}>
               <TouchableOpacity onPress={decreaseStock} style={styles.stockButton}>
                 <Minus size={16} color="#fff" />
               </TouchableOpacity>
-              <Text style={styles.stockText}>{currentStock}</Text>
+
+              <TextInput
+                style={styles.stockInput}
+                keyboardType="number-pad"
+                value={inputStock}
+                onChangeText={setInputStock}
+              />
+
               <TouchableOpacity onPress={increaseStock} style={styles.stockButton}>
                 <Plus size={16} color="#fff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={saveInputStock} style={styles.saveStockButton} disabled={isUpdatingStock}>
+                <Text style={styles.saveStockText}>Gravar</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -190,9 +182,7 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
             <Text style={styles.description}>{getDescriptionText()}</Text>
             {product.description.length > descriptionLimit && (
               <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)}>
-                <Text style={styles.showMoreText}>
-                  {showFullDescription ? 'Mostrar menos' : 'Mostrar mais'}
-                </Text>
+                <Text style={styles.showMoreText}>{showFullDescription ? 'Mostrar menos' : 'Mostrar mais'}</Text>
               </TouchableOpacity>
             )}
           </>
@@ -206,16 +196,12 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.saveButton} onPress={toggleFavorite} disabled={isLoadingFavorite}>
-              {isFavorite ? (
-                <BookmarkCheck size={18} color={COLORS.primary} />
-              ) : (
-                <Bookmark size={18} color={COLORS.primary} />
-              )}
+              {isFavorite ? <BookmarkCheck size={18} color={COLORS.primary} /> : <Bookmark size={18} color={COLORS.primary} />}
             </TouchableOpacity>
           </View>
         )}
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -245,11 +231,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 20,
   },
-  categoryText: {
-    color: COLORS.text,
-    fontSize: 12,
-    fontWeight: '500',
-  },
+  categoryText: { color: COLORS.text, fontSize: 12, fontWeight: '500' },
   commissionBadge: {
     position: 'absolute',
     top: 12,
@@ -259,90 +241,37 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 20,
   },
-  commissionText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  contentContainer: {
-    padding: 16,
-  },
-  name: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginBottom: 8,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  adminStockContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  stockButton: {
-    backgroundColor: COLORS.primary,
-    padding: 6,
-    borderRadius: 6,
-    marginHorizontal: 4,
-  },
-  stockText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginHorizontal: 6,
-  },
-  price: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  stock: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  description: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  showMoreText: {
-    color: COLORS.primary,
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 12,
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addButton: {
-    backgroundColor: COLORS.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    flex: 1,
-    marginRight: 10,
-  },
-  buttonText: {
-    color: COLORS.text,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  saveButton: {
-    padding: 8,
-    borderRadius: 6,
-    backgroundColor: COLORS.backgroundSecondary,
+  commissionText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  contentContainer: { padding: 16 },
+  name: { fontSize: 18, fontWeight: 'bold', color: COLORS.text, marginBottom: 8 },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  adminStockContainer: { flexDirection: 'row', alignItems: 'center' },
+  stockButton: { backgroundColor: COLORS.primary, padding: 6, borderRadius: 6, marginHorizontal: 4 },
+  stockInput: {
     borderWidth: 1,
     borderColor: COLORS.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 50,
+    height: 30,
+    textAlign: 'center',
+    borderRadius: 6,
+    marginHorizontal: 4,
+    color: COLORS.text,
   },
+  saveStockButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginLeft: 6,
+  },
+  saveStockText: { color: '#fff', fontWeight: 'bold' },
+  stockText: { fontSize: 14, fontWeight: 'bold', color: COLORS.text, marginHorizontal: 6 },
+  price: { fontSize: 18, fontWeight: '700', color: COLORS.primary },
+  stock: { fontSize: 12, color: COLORS.textSecondary },
+  description: { fontSize: 14, color: COLORS.textSecondary, marginBottom: 8, lineHeight: 20 },
+  showMoreText: { color: COLORS.primary, fontSize: 14, fontWeight: '500', marginBottom: 12 },
+  actions: { flexDirection: 'row', alignItems: 'center' },
+  addButton: { backgroundColor: COLORS.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 6, flex: 1, marginRight: 10 },
+  buttonText: { color: COLORS.text, fontWeight: '600', marginLeft: 8 },
+  saveButton: { padding: 8, borderRadius: 6, backgroundColor: COLORS.backgroundSecondary, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
 });
