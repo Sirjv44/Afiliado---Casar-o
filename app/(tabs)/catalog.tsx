@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,13 @@ import ProductCard, { Product } from '@/components/ProductCard';
 import { createClient } from '@/lib/supabase';
 import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react-native';
 
+// Recebe user do contexto de autenticação
+import { useAuth } from '@/context/AuthContext'; // exemplo, ajuste conforme seu projeto
+
 const ITEMS_PER_PAGE = 5;
 
 export default function CatalogScreen() {
+  const { user } = useAuth(); // obtendo o usuário logado
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>(['Todos']);
@@ -30,26 +34,25 @@ export default function CatalogScreen() {
       setLoading(true);
       const supabase = createClient();
 
-      let query = supabase
-        .from('products')
-        .select('*', { count: 'exact' })
-        .gt('stock', 0);
+      let query = supabase.from('products').select('*', { count: 'exact' });
 
       if (searchText.trim() !== '') {
-        // Se houver busca, ignora categoria e paginação
         query = query.or(
           `name.ilike.%${searchText}%,description.ilike.%${searchText}%`
         );
       } else {
-        // Filtro por categoria (se não for "Todos")
-        if (selectedCategory !== 'Todos') {
-          query = query.ilike('category', `%${selectedCategory}%`);
-        }
+        if (selectedCategory === 'Sem Estoque') {
+          query = query.eq('stock', 0);
+        } else {
+          query = query.gt('stock', 0);
+          if (selectedCategory !== 'Todos') {
+            query = query.ilike('category', `%${selectedCategory}%`);
+          }
 
-        // Paginação
-        const from = (currentPage - 1) * ITEMS_PER_PAGE;
-        const to = from + ITEMS_PER_PAGE - 1;
-        query = query.range(from, to);
+          const from = (currentPage - 1) * ITEMS_PER_PAGE;
+          const to = from + ITEMS_PER_PAGE - 1;
+          query = query.range(from, to);
+        }
       }
 
       const { data, count, error } = await query;
@@ -60,8 +63,8 @@ export default function CatalogScreen() {
         setProducts(data || []);
         if (count !== null) {
           setTotalPages(
-            searchText.trim() !== ''
-              ? 1 // Durante busca: mostrar tudo numa página só
+            searchText.trim() !== '' || selectedCategory === 'Sem Estoque'
+              ? 1
               : Math.ceil(count / ITEMS_PER_PAGE)
           );
         }
@@ -80,47 +83,44 @@ export default function CatalogScreen() {
         .from('products')
         .select('category')
         .gt('stock', 0);
-  
+
       if (error) {
         console.error('Erro ao buscar categorias:', error.message);
       } else if (data) {
-        // Extrair categorias únicas em lowercase e sem vazios
         const uniqueCatsSet = new Set(
           data
             .map((p) => (p.category ? p.category.trim().toLowerCase() : ''))
             .filter((c) => c !== '')
         );
-  
-        // Garantir que "todos" não esteja duplicado (remove caso exista)
+
         uniqueCatsSet.delete('todos');
-  
-        // Construir o array final, incluindo "Todos" no começo
-        const uniqueCategories = [
-          'Todos',
-          ...Array.from(uniqueCatsSet).map(
-            (c) => c.charAt(0).toUpperCase() + c.slice(1)
-          ),
-        ];
-  
-        setCategories(uniqueCategories);
+
+        let uniqueCategories = Array.from(uniqueCatsSet).map(
+          (c) => c.charAt(0).toUpperCase() + c.slice(1)
+        );
+
+        if (user?.admin) {
+          // "Sem Estoque" logo após "Todos"
+          uniqueCategories = ['Sem Estoque', ...uniqueCategories];
+        }
+
+        setCategories(['Todos', ...uniqueCategories]);
       }
     } catch (error) {
       console.error('Erro inesperado ao buscar categorias:', error);
     }
   };
 
-
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
       fetchProducts();
-    }, 500); // Pequeno delay para evitar busca a cada tecla digitada
-
+    }, 500);
     return () => clearTimeout(delayDebounce);
   }, [selectedCategory, currentPage, searchText]);
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [user?.admin]); // refaz categorias se user mudar
 
   const handleAddToCart = (product: Product) => {
     router.push({ pathname: '/order/new', params: { id: product.id } });
@@ -147,7 +147,7 @@ export default function CatalogScreen() {
             value={searchText}
             onChangeText={(text) => {
               setSearchText(text);
-              setCurrentPage(1); // Sempre volta pra página 1 ao buscar
+              setCurrentPage(1);
             }}
           />
         </View>
@@ -213,8 +213,8 @@ export default function CatalogScreen() {
         </ScrollView>
       )}
 
-      {/* Paginação (esconde quando estiver buscando) */}
-      {searchText.trim() === '' && (
+      {/* Paginação (oculta durante busca ou "Sem Estoque") */}
+      {searchText.trim() === '' && selectedCategory !== 'Sem Estoque' && (
         <View style={styles.paginationContainer}>
           <TouchableOpacity onPress={handlePrevPage} disabled={currentPage === 1}>
             <ChevronLeft
@@ -241,7 +241,6 @@ export default function CatalogScreen() {
 }
 
 const styles = StyleSheet.create({
-  // ... seus estilos continuam iguais ...
   container: { flex: 1, backgroundColor: COLORS.background },
   loadingContainer: {
     flex: 1,
