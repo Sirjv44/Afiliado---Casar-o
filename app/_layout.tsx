@@ -1,64 +1,41 @@
-import { useEffect, useState } from 'react';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
-import { AuthProvider } from '@/context/AuthContext';
+import { Stack, useRouter } from 'expo-router';
+import { useAuth, AuthProvider } from '@/context/AuthContext';
+import { View, ActivityIndicator } from 'react-native';
 import { COLORS } from '@/constants/Colors';
+import { useEffect } from 'react';
 
-const storage = {
-  getItem: async (key: string) => {
-    if (Platform.OS === 'web') {
-      return localStorage.getItem(key);
-    }
-    return await SecureStore.getItemAsync(key);
-  },
-};
-
-export default function Layout() {
-  useFrameworkReady();
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+function RootStack() {
+  const router = useRouter();
+  const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    const checkToken = async () => {
-      try {
-        const token = await storage.getItem('userToken');
-        setIsAuthenticated(!!token);
-      } catch (error) {
-        console.error('Failed to get authentication token:', error);
-        setIsAuthenticated(false);
-      } finally {
-        setIsLoading(false);
+    if (!isLoading) {
+      if (user) {
+        if (router.pathname !== '/(tabs)') router.replace('/(tabs)');
+      } else {
+        if (router.pathname !== '/(auth)/login') router.replace('/(auth)/login');
       }
-    };
+    }
+  }, [user, isLoading, router]);
+  
 
-    checkToken();
-  }, []);
-
+  // Renderiza loading se estiver carregando
   if (isLoading) {
-    return null;
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={COLORS.secondary} />
+      </View>
+    );
   }
 
+  // Não renderiza Stack vazio, o router.replace() vai direcionar
+  return <Stack screenOptions={{ headerShown: false }} />;
+}
+
+export default function Layout() {
   return (
     <AuthProvider>
-      <>
-        <Stack
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: COLORS.secondary,
-            },
-            headerTintColor: COLORS.text,
-            headerShadowVisible: false,
-            contentStyle: {
-              backgroundColor: COLORS.background,
-            },
-          }}
-        />
-        <StatusBar style="light" />
-      </>
+      <RootStack />
     </AuthProvider>
   );
 }
- 

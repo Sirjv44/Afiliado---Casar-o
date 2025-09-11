@@ -52,50 +52,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const loadSession = async () => {
+      setState(prev => ({ ...prev, isLoading: true })); // garante loading inicial
+  
       try {
         const { data: { session } } = await supabase.auth.getSession();
-
-        if (session) {
+  
+        if (session?.user) {
           const userId = session.user.id;
-
           const { data: userData, error } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', userId)
             .maybeSingle();
-
+  
           if (userData) {
-            const user: User = {
-              id: userData.id,
-              email: userData.email,
-              fullName: userData.full_name,
-              phone: userData.phone,
-              cpf: userData.cpf,
-              address: userData.address,
-              pixKey: userData.pix_key,
-              admin: userData.admin ?? false,
-            };
-
             setState({
-              user,
+              user: {
+                id: userData.id,
+                email: userData.email,
+                fullName: userData.full_name,
+                phone: userData.phone,
+                cpf: userData.cpf,
+                address: userData.address,
+                pixKey: userData.pix_key,
+                admin: userData.admin ?? false,
+              },
               session,
               isLoading: false,
             });
           } else {
-            console.error('Erro ao buscar perfil:', error);
-            setState((prev) => ({ ...prev, isLoading: false }));
+            setState({ user: null, session: null, isLoading: false });
           }
         } else {
-          setState((prev) => ({ ...prev, isLoading: false }));
+          setState({ user: null, session: null, isLoading: false });
         }
       } catch (error) {
-        console.error('Erro ao carregar sessão:', error);
-        setState((prev) => ({ ...prev, isLoading: false }));
+        console.error(error);
+        setState({ user: null, session: null, isLoading: false });
       }
     };
-
+  
     loadSession();
+  
+    // Escuta mudanças na sessão para web/mobile
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setState(prev => ({ ...prev, session, user: prev.user ?? null }));
+      } else {
+        setState({ user: null, session: null, isLoading: false });
+      }
+    });
+  
+    return () => listener?.subscription.unsubscribe();
   }, []);
+  
+  
 
   const signIn = async (email: string, password: string) => {
     try {

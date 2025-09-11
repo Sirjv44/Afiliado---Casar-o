@@ -34,42 +34,16 @@ export default function LoginScreen() {
       Alert.alert('Erro', 'Por favor, preencha todos os campos.');
       return;
     }
-
+  
     try {
       setIsLoading(true);
-
-      const { error } = await signIn(email, password);
-
-      if (!error) {
-        return;
-      }
-
-      console.log('Login pelo Auth falhou, tentando login via profiles...');
-
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('email', email)
-        .single();
-
-      if (profileError || !profile) {
-        Alert.alert('Erro de login', 'Email ou senha incorretos.');
-        return;
-      }
-
-      const senhaCorreta = await bcrypt.compare(password, profile.password);
-
-      if (!senhaCorreta) {
-        Alert.alert('Erro de login', 'Email ou senha incorretos.');
-        return;
-      }
-
-      Alert.alert('Sucesso', 'Login realizado com sucesso!');
-      router.replace('/(tabs)/index');
-
-    } catch (error) {
+  
+      // Chama o AuthContext, que já faz router.replace para tabs
+      await signIn(email, password);
+  
+    } catch (error: any) {
       console.error(error);
-      Alert.alert('Erro inesperado', 'Ocorreu um erro. Tente novamente mais tarde.');
+      Alert.alert('Erro de login', error.message || 'Email ou senha incorretos.');
     } finally {
       setIsLoading(false);
     }
