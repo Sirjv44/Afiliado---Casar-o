@@ -13,14 +13,12 @@ import { COLORS } from '@/constants/Colors';
 import ProductCard, { Product } from '@/components/ProductCard';
 import { createClient } from '@/lib/supabase';
 import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react-native';
-
-// Recebe user do contexto de autenticação
-import { useAuth } from '@/context/AuthContext'; // exemplo, ajuste conforme seu projeto
+import { useAuth } from '@/context/AuthContext';
 
 const ITEMS_PER_PAGE = 5;
 
 export default function CatalogScreen() {
-  const { user } = useAuth(); // obtendo o usuário logado
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>(['Todos']);
@@ -36,23 +34,25 @@ export default function CatalogScreen() {
 
       let query = supabase.from('products').select('*', { count: 'exact' });
 
+      // Filtro por busca
       if (searchText.trim() !== '') {
         query = query.or(
           `name.ilike.%${searchText}%,description.ilike.%${searchText}%`
         );
       } else {
+        // Filtro por categoria
         if (selectedCategory === 'Sem Estoque') {
           query = query.eq('stock', 0);
+        } else if (selectedCategory !== 'Todos') {
+          query = query.gt('stock', 0).ilike('category', `%${selectedCategory}%`);
         } else {
           query = query.gt('stock', 0);
-          if (selectedCategory !== 'Todos') {
-            query = query.ilike('category', `%${selectedCategory}%`);
-          }
-
-          const from = (currentPage - 1) * ITEMS_PER_PAGE;
-          const to = from + ITEMS_PER_PAGE - 1;
-          query = query.range(from, to);
         }
+
+        // Paginação
+        const from = (currentPage - 1) * ITEMS_PER_PAGE;
+        const to = from + ITEMS_PER_PAGE - 1;
+        query = query.range(from, to);
       }
 
       const { data, count, error } = await query;
@@ -62,11 +62,9 @@ export default function CatalogScreen() {
       } else {
         setProducts(data || []);
         if (count !== null) {
-          setTotalPages(
-            searchText.trim() !== '' || selectedCategory === 'Sem Estoque'
-              ? 1
-              : Math.ceil(count / ITEMS_PER_PAGE)
-          );
+          setTotalPages(Math.ceil(count / ITEMS_PER_PAGE));
+        } else {
+          setTotalPages(1);
         }
       }
     } catch (error) {
@@ -100,7 +98,6 @@ export default function CatalogScreen() {
         );
 
         if (user?.admin) {
-          // "Sem Estoque" logo após "Todos"
           uniqueCategories = ['Sem Estoque', ...uniqueCategories];
         }
 
@@ -120,7 +117,7 @@ export default function CatalogScreen() {
 
   useEffect(() => {
     fetchCategories();
-  }, [user?.admin]); // refaz categorias se user mudar
+  }, [user?.admin]);
 
   const handleAddToCart = (product: Product) => {
     router.push({ pathname: '/order/new', params: { id: product.id } });
@@ -213,8 +210,8 @@ export default function CatalogScreen() {
         </ScrollView>
       )}
 
-      {/* Paginação (oculta durante busca ou "Sem Estoque") */}
-      {searchText.trim() === '' && selectedCategory !== 'Sem Estoque' && (
+      {/* Paginação (oculta somente durante busca) */}
+      {searchText.trim() === '' && totalPages > 1 && (
         <View style={styles.paginationContainer}>
           <TouchableOpacity onPress={handlePrevPage} disabled={currentPage === 1}>
             <ChevronLeft
