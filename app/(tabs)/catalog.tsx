@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 12,
   },
-  categoriesScroll: { minHeight: 48, maxHeight: 'max-content'},
+  categoriesScroll: { minHeight: 48, flexShrink: 0, maxHeight: 'max-content'},
   categoriesContainer: { paddingHorizontal: 16, alignItems: 'center' },
   categoryButton: {
     paddingHorizontal: 16,
