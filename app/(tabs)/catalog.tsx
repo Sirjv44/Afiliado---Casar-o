@@ -14,6 +14,7 @@ import ProductCard, { Product } from '@/components/ProductCard';
 import { createClient } from '@/lib/supabase';
 import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '@/context/AuthContext';
+import { max } from 'moment';
 
 const ITEMS_PER_PAGE = 8;
 const ITEM_WIDTH = 220 + 16; // largura do item + marginHorizontal*2
@@ -313,7 +314,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 12,
   },
-  categoriesScroll: { maxHeight: 48 },
+  categoriesScroll: { minHeight: 48, maxHeight: 'max-content'},
   categoriesContainer: { paddingHorizontal: 16, alignItems: 'center' },
   categoryButton: {
     paddingHorizontal: 16,
@@ -321,6 +322,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: COLORS.card,
     marginRight: 8,
+    minWidth: 80,   // largura mínima
+    flexShrink: 0,  // não encolher
   },
   selectedCategory: { backgroundColor: COLORS.primary },
   categoryText: { color: COLORS.textSecondary, fontWeight: '500', fontSize: 14 },
