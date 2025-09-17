@@ -137,12 +137,19 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
     <View style={styles.card}>
       <View style={styles.imageContainer}>
         <Image source={{ uri: product.image_url }} style={styles.image} />
-        <View style={styles.categoryBadge}>
-          <Text style={styles.categoryText}>{product.category}</Text>
-        </View>
-        <View style={styles.commissionBadge}>
-          <Text style={styles.commissionText}>Comissão R$ {commissionValue.toFixed(2)}</Text>
-        </View>
+          {/* Mostrar categoria apenas para não-admin */}
+          {!user?.admin && (
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryText}>{product.category}</Text>
+            </View>
+          )}
+
+          {/* Mostrar comissão apenas para não-admin */}
+          {!user?.admin && (
+            <View style={styles.commissionBadge}>
+              <Text style={styles.commissionText}>Comissão R$ {commissionValue.toFixed(2)}</Text>
+            </View>
+          )}
       </View>
 
       <View style={styles.contentContainer}>

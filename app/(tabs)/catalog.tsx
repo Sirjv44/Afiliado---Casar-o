@@ -329,8 +329,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    flex: 1,
     marginTop: 12,
+    flexGrow: 0, // impede de ocupar toda a tela
   },
   arrowButton: {
     padding: 8,
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   noProductsContainer: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 40,
