@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import { createClient } from '@/lib/supabase';
 import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '@/context/AuthContext';
 
-const ITEMS_PER_PAGE = 5;
+const ITEMS_PER_PAGE = 8;
+const ITEM_WIDTH = 220 + 16; // largura do item + marginHorizontal*2
 
 export default function CatalogScreen() {
   const { user } = useAuth();
@@ -26,6 +27,9 @@ export default function CatalogScreen() {
   const [searchText, setSearchText] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+
+  const scrollRef = useRef<ScrollView>(null);
 
   const fetchProducts = async () => {
     try {
@@ -108,6 +112,7 @@ export default function CatalogScreen() {
     }
   };
 
+  // Atualiza produtos com debounce
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
       fetchProducts();
@@ -115,20 +120,43 @@ export default function CatalogScreen() {
     return () => clearTimeout(delayDebounce);
   }, [selectedCategory, currentPage, searchText]);
 
+  // Atualiza categorias
   useEffect(() => {
     fetchCategories();
   }, [user?.admin]);
+
+  // Reset do carrossel ao mudar produtos
+  useEffect(() => {
+    setCarouselIndex(0);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ x: 0, animated: false });
+    }
+  }, [products]);
 
   const handleAddToCart = (product: Product) => {
     router.push({ pathname: '/order/new', params: { id: product.id } });
   };
 
-  const handlePrevPage = () => {
-    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  const scrollLeft = () => {
+    if (scrollRef.current) {
+      const newIndex = Math.max(0, carouselIndex - 1);
+      scrollRef.current.scrollTo({
+        x: newIndex * ITEM_WIDTH,
+        animated: true,
+      });
+      setCarouselIndex(newIndex);
+    }
   };
 
-  const handleNextPage = () => {
-    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  const scrollRight = () => {
+    if (scrollRef.current) {
+      const newIndex = Math.min(products.length - 1, carouselIndex + 1);
+      scrollRef.current.scrollTo({
+        x: newIndex * ITEM_WIDTH,
+        animated: true,
+      });
+      setCarouselIndex(newIndex);
+    }
   };
 
   return (
@@ -184,36 +212,50 @@ export default function CatalogScreen() {
         ))}
       </ScrollView>
 
-      {/* Lista de produtos */}
+      {/* Lista de produtos em carrossel */}
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Carregando produtos...</Text>
         </View>
+      ) : products.length > 0 ? (
+        <View style={styles.carouselWrapper}>
+          <TouchableOpacity onPress={scrollLeft} style={styles.arrowButton}>
+            <ChevronLeft size={28} color={COLORS.text} />
+          </TouchableOpacity>
+
+          <ScrollView
+            ref={scrollRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={[styles.productsRow, { paddingHorizontal: 8 }]}
+            snapToInterval={ITEM_WIDTH}
+            decelerationRate="fast"
+          >
+            {products.map((product) => (
+              <View key={product.id} style={styles.productItem}>
+                <ProductCard product={product} onAddToCart={handleAddToCart} />
+              </View>
+            ))}
+          </ScrollView>
+
+          <TouchableOpacity onPress={scrollRight} style={styles.arrowButton}>
+            <ChevronRight size={28} color={COLORS.text} />
+          </TouchableOpacity>
+        </View>
       ) : (
-        <ScrollView style={styles.productsContainer}>
-          {products.length > 0 ? (
-            products.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onAddToCart={handleAddToCart}
-              />
-            ))
-          ) : (
-            <View style={styles.noProductsContainer}>
-              <Text style={styles.noProductsText}>
-                Nenhum produto encontrado.
-              </Text>
-            </View>
-          )}
-        </ScrollView>
+        <View style={styles.noProductsContainer}>
+          <Text style={styles.noProductsText}>Nenhum produto encontrado.</Text>
+        </View>
       )}
 
       {/* Paginação (oculta somente durante busca) */}
       {searchText.trim() === '' && totalPages > 1 && (
         <View style={styles.paginationContainer}>
-          <TouchableOpacity onPress={handlePrevPage} disabled={currentPage === 1}>
+          <TouchableOpacity
+            onPress={() => setCurrentPage(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
             <ChevronLeft
               size={28}
               color={currentPage === 1 ? COLORS.border : COLORS.text}
@@ -223,7 +265,7 @@ export default function CatalogScreen() {
             Página {currentPage} de {totalPages}
           </Text>
           <TouchableOpacity
-            onPress={handleNextPage}
+            onPress={() => setCurrentPage(currentPage + 1)}
             disabled={currentPage === totalPages}
           >
             <ChevronRight
@@ -283,7 +325,27 @@ const styles = StyleSheet.create({
   selectedCategory: { backgroundColor: COLORS.primary },
   categoryText: { color: COLORS.textSecondary, fontWeight: '500', fontSize: 14 },
   selectedCategoryText: { color: COLORS.text },
-  productsContainer: { flex: 1, padding: 16 },
+  carouselWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    flex: 1,
+    marginTop: 12,
+  },
+  arrowButton: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  productsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  productItem: {
+    width: 220,
+    marginHorizontal: 8,
+    flexShrink: 0,
+  },
   noProductsContainer: {
     flex: 1,
     justifyContent: 'center',

@@ -36,8 +36,8 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoadingFavorite, setIsLoadingFavorite] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
-  const [currentStock, setCurrentStock] = useState(product.stock); // Estado local do estoque
-  const [inputStock, setInputStock] = useState(product.stock.toString()); // Para input manual
+  const [currentStock, setCurrentStock] = useState(product.stock);
+  const [inputStock, setInputStock] = useState(product.stock.toString());
   const [isUpdatingStock, setIsUpdatingStock] = useState(false);
 
   const descriptionLimit = 100;
@@ -134,19 +134,21 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
   };
 
   return (
-    <View>
-      <Image source={{ uri: product.image_url }} style={styles.image} />
-
-      <View style={styles.categoryBadge}>
-        <Text style={styles.categoryText}>{product.category}</Text>
-      </View>
-
-      <View style={styles.commissionBadge}>
-        <Text style={styles.commissionText}>Comissão R$ {commissionValue.toFixed(2)}</Text>
+    <View style={styles.card}>
+      <View style={styles.imageContainer}>
+        <Image source={{ uri: product.image_url }} style={styles.image} />
+        <View style={styles.categoryBadge}>
+          <Text style={styles.categoryText}>{product.category}</Text>
+        </View>
+        <View style={styles.commissionBadge}>
+          <Text style={styles.commissionText}>Comissão R$ {commissionValue.toFixed(2)}</Text>
+        </View>
       </View>
 
       <View style={styles.contentContainer}>
-        <Text style={styles.name}>{product.name}</Text>
+        <Text style={styles.name} numberOfLines={2}>
+          {product.name}
+        </Text>
 
         <View style={styles.priceRow}>
           <Text style={styles.price}>R$ {product.price.toFixed(2)}</Text>
@@ -177,7 +179,8 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
           )}
         </View>
 
-        {product.description && (
+        {/* NÃO mostrar descrição se for admin */}
+        {!user?.admin && product.description && (
           <>
             <Text style={styles.description}>{getDescriptionText()}</Text>
             {product.description.length > descriptionLimit && (
@@ -196,7 +199,11 @@ export default function ProductCard({ product, onAddToCart, onViewDetails }: Pro
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.saveButton} onPress={toggleFavorite} disabled={isLoadingFavorite}>
-              {isFavorite ? <BookmarkCheck size={18} color={COLORS.primary} /> : <Bookmark size={18} color={COLORS.primary} />}
+              {isFavorite ? (
+                <BookmarkCheck size={18} color={COLORS.primary} />
+              ) : (
+                <Bookmark size={18} color={COLORS.primary} />
+              )}
             </TouchableOpacity>
           </View>
         )}
@@ -210,16 +217,23 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
     borderRadius: 12,
     marginBottom: 16,
+    marginHorizontal: 6, // garante espaçamento entre cards no carrossel
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+    width: 220, // define largura fixa para cada card (ajusta conforme necessário)
+  },
+  imageContainer: {
+    position: 'relative',
+    width: '100%',
+    aspectRatio: 1.2,
   },
   image: {
     width: '100%',
-    aspectRatio: 1.2,
+    height: '100%',
     resizeMode: 'cover',
   },
   categoryBadge: {
@@ -230,8 +244,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
+    zIndex: 2,
   },
-  categoryText: { color: COLORS.text, fontSize: 12, fontWeight: '500' },
+  categoryText: { color: '#fff', fontSize: 12, fontWeight: '500' },
   commissionBadge: {
     position: 'absolute',
     top: 12,
@@ -240,18 +255,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
+    zIndex: 2,
   },
   commissionText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  contentContainer: { padding: 16 },
-  name: { fontSize: 18, fontWeight: 'bold', color: COLORS.text, marginBottom: 8 },
-  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  adminStockContainer: { flexDirection: 'row', alignItems: 'center' },
+  contentContainer: { padding: 12 },
+  name: { fontSize: 16, fontWeight: 'bold', color: COLORS.text, marginBottom: 6 },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  adminStockContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginTop: 4,
+  },
   stockButton: { backgroundColor: COLORS.primary, padding: 6, borderRadius: 6, marginHorizontal: 4 },
   stockInput: {
     borderWidth: 1,
     borderColor: COLORS.border,
     width: 50,
-    height: 30,
+    height: 32,
     textAlign: 'center',
     borderRadius: 6,
     marginHorizontal: 4,
@@ -259,19 +286,45 @@ const styles = StyleSheet.create({
   },
   saveStockButton: {
     backgroundColor: COLORS.primary,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
     marginLeft: 6,
+    minWidth: 70,
+    alignItems: 'center',
   },
   saveStockText: { color: '#fff', fontWeight: 'bold' },
-  stockText: { fontSize: 14, fontWeight: 'bold', color: COLORS.text, marginHorizontal: 6 },
-  price: { fontSize: 18, fontWeight: '700', color: COLORS.primary },
+  price: { fontSize: 16, fontWeight: '700', color: COLORS.primary },
   stock: { fontSize: 12, color: COLORS.textSecondary },
   description: { fontSize: 14, color: COLORS.textSecondary, marginBottom: 8, lineHeight: 20 },
-  showMoreText: { color: COLORS.primary, fontSize: 14, fontWeight: '500', marginBottom: 12 },
-  actions: { flexDirection: 'row', alignItems: 'center' },
-  addButton: { backgroundColor: COLORS.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 6, flex: 1, marginRight: 10 },
-  buttonText: { color: COLORS.text, fontWeight: '600', marginLeft: 8 },
-  saveButton: { padding: 8, borderRadius: 6, backgroundColor: COLORS.backgroundSecondary, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
+  showMoreText: { color: COLORS.primary, fontSize: 14, fontWeight: '500', marginBottom: 8 },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginTop: 8,
+    gap: 8,
+  },
+  addButton: {
+    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    minWidth: 120,
+    flex: 1,
+  },
+  buttonText: { color: '#fff', fontWeight: '600', marginLeft: 6 },
+  saveButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: COLORS.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 50,
+  },
 });
