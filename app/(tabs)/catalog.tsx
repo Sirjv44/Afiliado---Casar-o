@@ -14,7 +14,6 @@ import ProductCard, { Product } from '@/components/ProductCard';
 import { createClient } from '@/lib/supabase';
 import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '@/context/AuthContext';
-import { max } from 'moment';
 
 const ITEMS_PER_PAGE = 8;
 const ITEM_WIDTH = 220 + 16; // largura do item + marginHorizontal*2
@@ -213,37 +212,43 @@ export default function CatalogScreen() {
         ))}
       </ScrollView>
 
-      {/* Lista de produtos em carrossel */}
+      {/* Lista de produtos com scroll vertical */}
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Carregando produtos...</Text>
         </View>
       ) : products.length > 0 ? (
-        <View style={styles.carouselWrapper}>
-          <TouchableOpacity onPress={scrollLeft} style={styles.arrowButton}>
-            <ChevronLeft size={28} color={COLORS.text} />
-          </TouchableOpacity>
+        <ScrollView
+          style={styles.productsScroll}
+          contentContainerStyle={styles.productsScrollContent}
+          showsVerticalScrollIndicator={true}
+        >
+          <View style={styles.carouselWrapper}>
+            <TouchableOpacity onPress={scrollLeft} style={styles.arrowButton}>
+              <ChevronLeft size={28} color={COLORS.text} />
+            </TouchableOpacity>
 
-          <ScrollView
-            ref={scrollRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={[styles.productsRow, { paddingHorizontal: 8 }]}
-            snapToInterval={ITEM_WIDTH}
-            decelerationRate="fast"
-          >
-            {products.map((product) => (
-              <View key={product.id} style={styles.productItem}>
-                <ProductCard product={product} onAddToCart={handleAddToCart} />
-              </View>
-            ))}
-          </ScrollView>
+            <ScrollView
+              ref={scrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={[styles.productsRow, { paddingHorizontal: 8 }]}
+              snapToInterval={ITEM_WIDTH}
+              decelerationRate="fast"
+            >
+              {products.map((product) => (
+                <View key={product.id} style={styles.productItem}>
+                  <ProductCard product={product} onAddToCart={handleAddToCart} />
+                </View>
+              ))}
+            </ScrollView>
 
-          <TouchableOpacity onPress={scrollRight} style={styles.arrowButton}>
-            <ChevronRight size={28} color={COLORS.text} />
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity onPress={scrollRight} style={styles.arrowButton}>
+              <ChevronRight size={28} color={COLORS.text} />
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       ) : (
         <View style={styles.noProductsContainer}>
           <Text style={styles.noProductsText}>Nenhum produto encontrado.</Text>
@@ -314,7 +319,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 12,
   },
-  categoriesScroll: { minHeight: 48, flexShrink: 0, maxHeight: 'max-content'},
+  categoriesScroll: { minHeight: 48, flexShrink: 0, maxHeight: 'min-content' },
   categoriesContainer: { paddingHorizontal: 16, alignItems: 'center' },
   categoryButton: {
     paddingHorizontal: 16,
@@ -322,18 +327,23 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: COLORS.card,
     marginRight: 8,
-    minWidth: 80,   // largura mínima
-    flexShrink: 0,  // não encolher
+    minWidth: 80,
+    flexShrink: 0,
   },
   selectedCategory: { backgroundColor: COLORS.primary },
   categoryText: { color: COLORS.textSecondary, fontWeight: '500', fontSize: 14 },
   selectedCategoryText: { color: COLORS.text },
+  productsScroll: {
+    flex: 1,
+    marginTop: 12,
+  },
+  productsScrollContent: {
+    paddingBottom: 16,
+  },
   carouselWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    marginTop: 12,
-    flexGrow: 0, // impede de ocupar toda a tela
+    flexGrow: 0,
   },
   arrowButton: {
     padding: 8,
