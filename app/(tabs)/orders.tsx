@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { COLORS } from '@/constants/Colors';
 import { ShoppingBag, ChevronRight, Plus } from 'lucide-react-native';
@@ -88,11 +89,11 @@ export default function OrdersScreen() {
             minute: '2-digit',
           })}`;
         }
-      
+
         return {
           id: order.id,
           clientName: order.client_name ?? 'Cliente não informado',
-          date: formattedDate, // 👈 agora tem data e hora
+          date: formattedDate,
           totalAmount: typeof order.total_amount === 'number' ? order.total_amount : 0,
           status: order.status,
           items: itemCounts[order.id] ?? 0,
@@ -103,6 +104,56 @@ export default function OrdersScreen() {
       setOrders(transformed);
     } catch (error) {
       console.error('Erro ao carregar pedidos:', error);
+    }
+  };
+
+  const updateOrderStatus = async (orderId: number, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      Alert.alert('Sucesso', `Pedido atualizado para ${newStatus === 'delivered' ? 'Entregue' : ''}`);
+      loadOrders();
+    } catch (err) {
+      console.error('Erro ao atualizar status:', err);
+      Alert.alert('Erro', 'Não foi possível atualizar o pedido.');
+    }
+  };
+
+  const excluirPedido = async (orderId: number) => {
+    try {
+      // Excluir comissões
+      const { error: erroComissoes } = await supabase
+        .from('commissions')
+        .delete()
+        .eq('order_id', orderId);
+      if (erroComissoes) throw erroComissoes;
+
+      // Excluir itens
+      const { error: erroItens } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('order_id', orderId);
+      if (erroItens) throw erroItens;
+
+      // Excluir pedido
+      const { error: erroPedido } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+      if (erroPedido) throw erroPedido;
+
+      // Atualizar lista imediatamente
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+
+      Alert.alert('Sucesso', 'Pedido excluído com sucesso!');
+    } catch (err) {
+      console.error('Erro ao excluir pedido:', err);
+      Alert.alert('Erro', 'Não foi possível excluir o pedido.');
     }
   };
 
@@ -177,29 +228,45 @@ export default function OrdersScreen() {
           <Text style={styles.statusText}>{statusLabels[item.status]}</Text>
         </View>
       </View>
+
+      {isAdmin && (
+        <View style={styles.adminActions}>
+          <TouchableOpacity
+            style={[styles.adminButton, { backgroundColor: COLORS.success }]}
+            onPress={() => updateOrderStatus(item.id, 'delivered')}
+          >
+            <Text style={styles.adminButtonText}>Marcar como Entregue</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.adminButton, { backgroundColor: COLORS.error }]}
+            onPress={() => excluirPedido(item.id)}
+          >
+            <Text style={styles.adminButtonText}>Excluir Pedido</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
       {renderFilterButtons()}
-  
-      {/* 👇 Resumo de quantas vendas tem no filtro atual */}
+
       <View style={styles.summaryContainer}>
         <Text style={styles.summaryText}>
           {orders.length}{' '}
-          {orders.length === 1 ? 'venda enviada' : `vendas ${statusLabels[activeFilter].toLowerCase()}s`}
+          {orders.length === 1 ? 'venda' : 'vendas'} {statusLabels[activeFilter].toLowerCase()}s
         </Text>
       </View>
 
-  
       <FlatList
         data={orders}
         renderItem={renderOrderItem}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.listContainer}
       />
-  
+
       <TouchableOpacity
         style={styles.fabButton}
         onPress={() => router.push('/order/new')}
@@ -208,138 +275,34 @@ export default function OrdersScreen() {
       </TouchableOpacity>
     </View>
   );
-  
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  listContainer: {
-    padding: 16,
-    paddingBottom: 80,
-  },
-  summaryContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: COLORS.card,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  summaryText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.text,
-  },  
-  filterContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingVertical: 12,
-  },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    backgroundColor: COLORS.card,
-    borderRadius: 20,
-    marginHorizontal: 6,
-  },
-  activeFilter: {
-    backgroundColor: COLORS.primary,
-  },
-  filterText: {
-    color: COLORS.textSecondary,
-    fontWeight: '500',
-    fontSize: 14,
-  },
-  activeFilterText: {
-    color: COLORS.text,
-  },
-  orderCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    marginBottom: 16,
-    padding: 16,
-  },
-  orderHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  orderIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  orderInfo: {
-    flex: 1,
-  },
-  clientName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.text,
-  },
-  orderId: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  affiliateName: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  orderDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  detailItem: {
-    alignItems: 'center',
-  },
-  detailLabel: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginBottom: 4,
-  },
-  detailValue: {
-    fontSize: 14,
-    color: COLORS.text,
-    fontWeight: '600',
-  },
-  orderFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  statusBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-  },
-  statusText: {
-    fontSize: 12,
-    color: COLORS.text,
-    fontWeight: '500',
-  },
-  fabButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  listContainer: { padding: 16, paddingBottom: 80 },
+  summaryContainer: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: COLORS.card, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  summaryText: { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  filterContainer: { flexDirection: 'row', justifyContent: 'center', paddingVertical: 12 },
+  filterButton: { paddingHorizontal: 16, paddingVertical: 6, backgroundColor: COLORS.card, borderRadius: 20, marginHorizontal: 6 },
+  activeFilter: { backgroundColor: COLORS.primary },
+  filterText: { color: COLORS.textSecondary, fontWeight: '500', fontSize: 14 },
+  activeFilterText: { color: COLORS.text },
+  orderCard: { backgroundColor: COLORS.card, borderRadius: 12, marginBottom: 16, padding: 16 },
+  orderHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  orderIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  orderInfo: { flex: 1 },
+  clientName: { fontSize: 16, fontWeight: 'bold', color: COLORS.text },
+  orderId: { fontSize: 12, color: COLORS.textSecondary },
+  affiliateName: { fontSize: 12, color: COLORS.textSecondary },
+  orderDetails: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  detailItem: { alignItems: 'center' },
+  detailLabel: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 4 },
+  detailValue: { fontSize: 14, color: COLORS.text, fontWeight: '600' },
+  orderFooter: { flexDirection: 'row', justifyContent: 'flex-end' },
+  statusBadge: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 16 },
+  statusText: { fontSize: 12, color: COLORS.text, fontWeight: '500' },
+  fabButton: { position: 'absolute', bottom: 20, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84 },
+  adminActions: { marginTop: 12, flexDirection: 'row', justifyContent: 'space-between' },
+  adminButton: { flex: 1, paddingVertical: 8, marginHorizontal: 4, borderRadius: 8 },
+  adminButtonText: { textAlign: 'center', color: '#FFF', fontWeight: '600', fontSize: 14 },
 });
