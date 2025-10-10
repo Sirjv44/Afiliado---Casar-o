@@ -18,6 +18,7 @@ import { COLORS } from '@/constants/Colors';
 import StatusCard from '@/components/StatusCard';
 import ActionButton from '@/components/ActionButton';
 import { Asset } from 'expo-asset';
+import { Share } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 import {
   ShoppingBag,
@@ -34,6 +35,7 @@ import { createClient } from '@/lib/supabase';
 
 export default function DashboardScreen() {
   const { user, signOut } = useAuth();
+  const inviteLink = `https://xn--afiliadocasaro-2hb.com/register?ref=${user?.id}`;
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [ofertasSemana, setOfertasSemana] = useState([]);
@@ -212,6 +214,40 @@ export default function DashboardScreen() {
             onPress={() => router.push('/dashboard/eu')}
             icon={<BarChart size={20} color="#FFFFFF" />}
           />
+          {user?.admin && (
+            <ActionButton
+              title="Indique e Ganhe"
+              onPress={async () => {
+                const message = `🚀 Participe do Casarão!\nCadastre-se com meu link e ganhe recompensas:\n${inviteLink}`;
+                try {
+                  if (Platform.OS === 'web') {
+                    // Verifica se navegador suporta share
+                    if (navigator.canShare && navigator.canShare({ text: message })) {
+                      await navigator.share({
+                        title: 'Indique e Ganhe - Casarão',
+                        text: message,
+                        url: inviteLink,
+                      });
+                    } else {
+                      // Fallback — copia pro clipboard
+                      await navigator.clipboard.writeText(inviteLink);
+                      alert('✅ Link copiado! Envie para seus amigos e comece a indicar!');
+                    }
+                  } else {
+                    // Mobile (Android/iOS)
+                    await Share.share({ message });
+                  }
+                } catch (error) {
+                  console.warn('Erro ao compartilhar link:', error);
+                  alert('⚠️ O compartilhamento não é permitido neste navegador. O link foi copiado!');
+                  try {
+                    await navigator.clipboard.writeText(inviteLink);
+                  } catch {}
+                }
+              }}
+              icon={<Users size={20} color="#FFFFFF" />}
+            />
+          )}
           <ActionButton
             title="Ver Extrato"
             onPress={() => router.push('/dashboard/extrato')}

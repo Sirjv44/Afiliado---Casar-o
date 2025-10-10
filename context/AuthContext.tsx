@@ -17,6 +17,7 @@ interface User {
   address: string;
   pixKey: string;
   admin: boolean;
+  referredBy?: string | null;
 }
 
 interface AuthState {
@@ -35,6 +36,7 @@ interface AuthContextType extends AuthState {
     cpf: string;
     address: string;
     pixKey: string;
+    referredBy?: string | null;
   }) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -53,7 +55,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const loadSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
         if (session) {
           const userId = session.user.id;
@@ -74,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               address: userData.address,
               pixKey: userData.pix_key,
               admin: userData.admin ?? false,
+              referredBy: userData.referred_by ?? null,
             };
 
             setState({
@@ -126,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         address: userData.address,
         pixKey: userData.pix_key,
         admin: userData.admin ?? false,
+        referredBy: userData.referred_by ?? null,
       };
 
       setState({
@@ -149,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     cpf: string;
     address: string;
     pixKey: string;
+    referredBy?: string | null;
   }) => {
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -158,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error || !data.user) throw error;
 
+      // Cria o perfil na tabela profiles
       const { error: profileError } = await supabase.from('profiles').insert({
         id: data.user.id,
         email: userData.email,
@@ -167,10 +175,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         address: userData.address,
         pix_key: userData.pixKey,
         admin: false,
+        referred_by: userData.referredBy || null, // 🔗 Salva quem indicou
         created_at: new Date(),
       });
 
       if (profileError) throw profileError;
+
+      // 🔹 Registra a indicação, se houver afiliado indicador
+      if (userData.referredBy) {
+        const { error: indicacaoError } = await supabase.from('indicacoes').insert({
+          afiliado_indicador_id: userData.referredBy,
+          afiliado_indicado_id: data.user.id,
+          data_indicacao: new Date().toISOString(),
+        });
+
+        if (indicacaoError) console.warn('Erro ao registrar indicação:', indicacaoError);
+      }
 
       await signIn(userData.email, userData.password);
     } catch (error) {
