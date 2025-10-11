@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -10,7 +10,7 @@ import {
   Alert,
   Image
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { COLORS } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
 import { Mail, User, Phone, Key, Hash, MapPin } from 'lucide-react-native';
@@ -19,6 +19,17 @@ export default function RegisterScreen() {
   const { signUp } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [highlightedFields, setHighlightedFields] = useState<string[]>([]);
+  const [referredBy, setReferredBy] = useState<string | null>(null);
+
+  // Captura o parâmetro "ref" da URL (ex: ?ref=uuid)
+  const params = useLocalSearchParams();
+
+  useEffect(() => {
+    if (params?.ref) {
+      setReferredBy(params.ref as string);
+      console.log("🔗 Afiliado indicado por:", params.ref);
+    }
+  }, [params]);
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -74,6 +85,7 @@ export default function RegisterScreen() {
 
     try {
       setIsLoading(true);
+
       await signUp({
         email: formData.email,
         password: formData.password,
@@ -82,12 +94,13 @@ export default function RegisterScreen() {
         cpf: formData.cpf,
         address: formData.address,
         pixKey: formData.pixKey,
+        referredBy, // 👈 Adiciona o afiliado indicador (caso exista)
       });
 
       Alert.alert('Sucesso', 'Cadastro realizado com sucesso!');
       router.replace('/(tabs)/');
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('❌ Registration error:', error);
       Alert.alert('Erro', 'Não foi possível realizar o cadastro. Tente novamente.');
     } finally {
       setIsLoading(false);

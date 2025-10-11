@@ -52,12 +52,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const supabase = createClient();
 
+  // 🔹 Carrega sessão e perfil ao iniciar
   useEffect(() => {
     const loadSession = async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const { data: { session } } = await supabase.auth.getSession();
 
         if (session) {
           const userId = session.user.id;
@@ -68,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .eq('id', userId)
             .maybeSingle();
 
+          if (error) throw error;
           if (userData) {
             const user: User = {
               id: userData.id,
@@ -81,14 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               referredBy: userData.referred_by ?? null,
             };
 
-            setState({
-              user,
-              session,
-              isLoading: false,
-            });
-          } else {
-            console.error('Erro ao buscar perfil:', error);
-            setState((prev) => ({ ...prev, isLoading: false }));
+            setState({ user, session, isLoading: false });
           }
         } else {
           setState((prev) => ({ ...prev, isLoading: false }));
@@ -102,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadSession();
   }, []);
 
+  // 🔹 Login
   const signIn = async (email: string, password: string) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -147,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // 🔹 Cadastro com indicação opcional
   const signUp = async (userData: {
     email: string;
     password: string;
@@ -158,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     referredBy?: string | null;
   }) => {
     try {
+      // Cria usuário no Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email: userData.email,
         password: userData.password,
@@ -165,7 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error || !data.user) throw error;
 
-      // Cria o perfil na tabela profiles
+      // Cria registro na tabela profiles
       const { error: profileError } = await supabase.from('profiles').insert({
         id: data.user.id,
         email: userData.email,
@@ -175,23 +171,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         address: userData.address,
         pix_key: userData.pixKey,
         admin: false,
-        referred_by: userData.referredBy || null, // 🔗 Salva quem indicou
-        created_at: new Date(),
+        referred_by: userData.referredBy || null, // 🔗 salva quem indicou
+        created_at: new Date().toISOString(),
       });
 
       if (profileError) throw profileError;
 
-      // 🔹 Registra a indicação, se houver afiliado indicador
+      // 🔹 Registra a indicação (se tiver)
       if (userData.referredBy) {
-        const { error: indicacaoError } = await supabase.from('indicacoes').insert({
-          afiliado_indicador_id: userData.referredBy,
-          afiliado_indicado_id: data.user.id,
-          data_indicacao: new Date().toISOString(),
-        });
+        const { error: indicacaoError } = await supabase
+          .from('indicacoes')
+          .insert({
+            afiliado_indicador_id: userData.referredBy,
+            afiliado_indicado_id: data.user.id,
+            data_indicacao: new Date().toISOString(),
+          });
 
-        if (indicacaoError) console.warn('Erro ao registrar indicação:', indicacaoError);
+        if (indicacaoError)
+          console.warn('Erro ao registrar indicação:', indicacaoError);
       }
 
+      // Faz login automático após o cadastro
       await signIn(userData.email, userData.password);
     } catch (error) {
       console.error('Erro no cadastro:', error);
@@ -199,17 +199,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // 🔹 Logout
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
-      setState({
-        user: null,
-        session: null,
-        isLoading: false,
-      });
-
+      setState({ user: null, session: null, isLoading: false });
       router.replace('/(auth)/login');
     } catch (error) {
       console.error('Erro ao sair:', error);
@@ -231,10 +227,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// 🔹 Hook personalizado para usar autenticação
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
+  if (!context)
     throw new Error('useAuth deve ser usado dentro de um AuthProvider');
-  }
   return context;
 };
