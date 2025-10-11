@@ -500,22 +500,21 @@ export default function NewOrderScreen() {
 
   const handleSubmitOrder = async () => {
     const supabase = createClient();
-
+  
     try {
       setIsLoading(true);
-
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-
+  
+      // 🔐 1. Autenticação
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !sessionData.session) {
         Alert.alert('Erro', 'Usuário não autenticado. Faça login.');
         return;
       }
-
-      const userId = sessionData.session.user.id;
+  
+      const userId = sessionData.session.user.id; // Afiliado indicado (quem está vendendo)
       const { name, phone, address, notes } = customerInfo;
-
-      // 1. Inserir pedido na tabela 'orders'
+  
+      // 🧾 2. Inserir pedido
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert([
@@ -531,126 +530,145 @@ export default function NewOrderScreen() {
         ])
         .select('id')
         .single();
-
+  
       if (orderError || !orderData?.id) throw orderError;
-
       const orderId = orderData.id;
-
-      // 2. Inserir itens do pedido na tabela 'order_items'
+  
+      // 📦 3. Inserir itens do pedido
       const itemsToInsert = cartItems.map((item) => ({
         order_id: orderId,
         product_id: item.id,
         quantity: item.quantity,
         price: item.price,
       }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(itemsToInsert);
-
+  
+      const { error: itemsError } = await supabase.from('order_items').insert(itemsToInsert);
       if (itemsError) {
-        // Rollback: deletar o pedido se os itens falharem
-        await supabase.from('orders').delete().eq('id', orderId);
+        await supabase.from('orders').delete().eq('id', orderId); // rollback
         throw itemsError;
       }
-
-      // 3. Atualizar o estoque dos produtos corretamente
+  
+      // 🏷️ 4. Atualizar estoque
       for (const item of cartItems) {
-        const { data: productData, error: fetchError } = await supabase
+        const { data: product, error: fetchError } = await supabase
           .from('products')
           .select('stock')
           .eq('id', item.id)
           .single();
-
-        if (fetchError || !productData) {
-          console.error(
-            `Erro ao buscar estoque do produto ${item.name}:`,
-            fetchError?.message
-          );
-          continue; // pula este produto
-        }
-
-        const newStock = productData.stock - item.quantity;
-
-        const { error: updateError } = await supabase
-          .from('products')
-          .update({ stock: newStock })
-          .eq('id', item.id);
-
-        if (updateError) {
-          console.error(
-            `Erro ao atualizar estoque do produto ${item.name}:`,
-            updateError.message
-          );
+  
+        if (!fetchError && product) {
+          const newStock = product.stock - item.quantity;
+          await supabase.from('products').update({ stock: newStock }).eq('id', item.id);
         }
       }
-
+  
+      // 💰 5. Comissão normal do afiliado que vendeu
       const highCommissionKeywords = ['tribulus', 'maca peruana', 'provitalis', 'cindura', 'ioimbina', 'viper'];
-
-  const commissionsToInsert = cartItems.map((item) => {
-    const name = item.name.toLowerCase();
-    const isHighCommission = highCommissionKeywords.some((keyword) =>
-      name.startsWith(keyword) || name.includes(keyword)
-    );
-
-    // Se o produto tiver commission_percentage definido, usar ele. Caso contrário, usar regra padrão.
-    const isValidPercentage = typeof item.commission_percentage === 'number' && !isNaN(item.commission_percentage);
-
-    const commissionRate = isValidPercentage
-      ? item.commission_percentage
-      : isHighCommission
-        ? 0.4
-        : 0.20;
-
-
-    const amount = parseFloat((item.price * item.quantity * commissionRate).toFixed(2));
-
-    return {
-      order_id: orderId,
-      affiliate_id: userId,
-      amount,
-      status: 'pending',
-    };
-  });
-
-      const { error: commissionError } = await supabase
-        .from('commissions')
-        .insert(commissionsToInsert);
-
-      if (commissionError) {
-        console.error('Erro ao registrar comissão:', commissionError.message);
+  
+      const commissionsToInsert = cartItems.map((item) => {
+        const name = item.name.toLowerCase();
+        const isHigh = highCommissionKeywords.some((kw) => name.includes(kw));
+        const isValid = typeof item.commission_percentage === 'number' && !isNaN(item.commission_percentage);
+  
+        const rate = isValid ? item.commission_percentage : isHigh ? 0.4 : 0.2;
+        const amount = parseFloat((item.price * item.quantity * rate).toFixed(2));
+  
+        return {
+          order_id: orderId,
+          affiliate_id: userId,
+          amount,
+          status: 'pending',
+          type: 'comissao_normal',
+        };
+      });
+  
+      const { error: commissionError } = await supabase.from('commissions').insert(commissionsToInsert);
+      if (commissionError) console.error('Erro ao registrar comissão normal:', commissionError.message);
+  
+      // 👥 6. Verifica se o afiliado vendedor tem um indicador
+      const { data: affiliateProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('referred_by')
+        .eq('id', userId)
+        .maybeSingle();
+  
+      if (profileError) throw profileError;
+  
+      if (affiliateProfile?.referred_by) {
+        const indicadorId = affiliateProfile.referred_by;
+  
+        // 🔎 Conta quantas vendas o afiliado indicado já fez
+        const { count, error: countError } = await supabase
+          .from('orders')
+          .select('*', { count: 'exact', head: true })
+          .eq('affiliate_id', userId)
+          .in('status', ['shipped', 'delivered']);
+  
+        if (countError) throw countError;
+  
+        // 🧮 Calcula comissão do afiliado indicador
+        let commissionAmount = 0;
+        let type = '';
+  
+        if (count === 1) {
+          commissionAmount = 20; // primeira venda
+          type = 'bonus_inicial';
+        } else if (count && count > 1) {
+          commissionAmount = Number(subtotal) * 0.02; // 2% do total
+          type = 'comissao_rede';
+        }
+  
+        if (commissionAmount > 0) {
+          // 🧱 Evita duplicar comissão de rede
+          const { data: existing } = await supabase
+            .from('commissions')
+            .select('id')
+            .eq('order_id', orderId)
+            .eq('affiliate_id', indicadorId)
+            .maybeSingle();
+  
+          if (!existing) {
+            const { error: insertError } = await supabase.from('commissions').insert([
+              {
+                order_id: orderId,
+                affiliate_id: indicadorId,
+                amount: commissionAmount,
+                status: 'pending',
+                created_at: new Date().toISOString(),
+                type,
+              },
+            ]);
+  
+            if (insertError) {
+              console.error('Erro ao registrar comissão do indicador:', insertError.message);
+            } else {
+              console.log('✅ Comissão de rede registrada:', { type, valor: commissionAmount });
+            }
+          } else {
+            console.log('🚫 Comissão de rede já existente, ignorando...');
+          }
+        }
       }
-
-      // 4. Sucesso
+  
+      // 🎉 7. Sucesso
       Alert.alert('Pedido Realizado!', 'Seu pedido foi enviado com sucesso.');
       setOrderSuccess(true);
       setCartItems([]);
       setStep(1);
-      setCustomerInfo({
-        name: '',
-        phone: '',
-        address: '',
-        notes: '',
-      });
+      setCustomerInfo({ name: '', phone: '', address: '', notes: '' });
       setTimeout(() => setOrderSuccess(false), 4000);
-
-      // Recarrega produtos com estoque atualizado
-      const { data: updatedProducts, error: reloadError } = await supabase
-        .from('products')
-        .select('*');
-      if (!reloadError) {
-        setProducts(updatedProducts);
-      }
+  
+      // 🔄 Recarrega produtos
+      const { data: updatedProducts } = await supabase.from('products').select('*');
+      if (updatedProducts) setProducts(updatedProducts);
     } catch (error) {
       console.error('Erro ao salvar pedido:', error.message || error);
-      Alert.alert(
-        'Erro',
-        'Falha ao enviar pedido. Verifique os dados e tente novamente.'
-      );
+      Alert.alert('Erro', 'Falha ao enviar pedido. Verifique os dados e tente novamente.');
     } finally {
       setIsLoading(false);
     }
   };
+  
 
 
 
