@@ -214,7 +214,6 @@ export default function DashboardScreen() {
             onPress={() => router.push('/dashboard/eu')}
             icon={<BarChart size={20} color="#FFFFFF" />}
           />
-          {user?.admin && (
             <ActionButton
               title="Indique e Ganhe"
               onPress={async () => {
@@ -247,7 +246,6 @@ export default function DashboardScreen() {
               }}
               icon={<Users size={20} color="#FFFFFF" />}
             />
-          )}
           <ActionButton
             title="Ver Extrato"
             onPress={() => router.push('/dashboard/extrato')}
