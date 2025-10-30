@@ -237,15 +237,16 @@ export default function OrdersScreen() {
           >
             <Text style={styles.adminButtonText}>Marcar como Entregue</Text>
           </TouchableOpacity>
-
+        </View>  
+      )}
+        <View style={styles.adminActions}>
           <TouchableOpacity
-            style={[styles.adminButton, { backgroundColor: COLORS.error }]}
-            onPress={() => excluirPedido(item.id)}
-          >
-            <Text style={styles.adminButtonText}>Excluir Pedido</Text>
+              style={[styles.adminButton, { backgroundColor: COLORS.error }]}
+              onPress={() => excluirPedido(item.id)}
+            >
+              <Text style={styles.adminButtonText}>Excluir Pedido</Text>
           </TouchableOpacity>
         </View>
-      )}
     </TouchableOpacity>
   );
 
