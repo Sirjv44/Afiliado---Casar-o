@@ -31,6 +31,11 @@ import {
   BarChart,
   FileText,
 } from 'lucide-react-native';
+import 'react-native-url-polyfill/auto';
+import { Buffer } from 'buffer';
+
+global.Buffer = global.Buffer || Buffer;
+
 import { createClient } from '@/lib/supabase';
 
 export default function DashboardScreen() {

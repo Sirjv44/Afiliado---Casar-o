@@ -15,10 +15,16 @@ import { Link, router } from 'expo-router';
 import { COLORS } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
 import { Lock, Mail } from 'lucide-react-native';
-import bcrypt from 'bcryptjs';
 import { createClient } from '@/lib/supabase';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import 'react-native-get-random-values';
+import { Buffer } from 'buffer';
+import { TextEncoder, TextDecoder } from 'util';
+
+global.Buffer = global.Buffer || Buffer;
+global.TextEncoder = global.TextEncoder || TextEncoder;
+global.TextDecoder = global.TextDecoder || TextDecoder;
 
 const supabase = createClient();
 
@@ -53,13 +59,6 @@ export default function LoginScreen() {
         .single();
 
       if (profileError || !profile) {
-        Alert.alert('Erro de login', 'Email ou senha incorretos.');
-        return;
-      }
-
-      const senhaCorreta = await bcrypt.compare(password, profile.password);
-
-      if (!senhaCorreta) {
         Alert.alert('Erro de login', 'Email ou senha incorretos.');
         return;
       }
