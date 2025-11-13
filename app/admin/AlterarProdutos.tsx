@@ -13,8 +13,20 @@ import { COLORS } from '@/constants/Colors';
 import { createClient } from '@/lib/supabase';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
+// Tipagem básica para um produto
+interface Product {
+  id: string;
+  name: string;
+  price: number | string;
+  stock: number | string;
+  description: string | null;
+  category: string | null;
+  image_url: string | null;
+  commission_percentage: number | string | null;
+}
+
 export default function EditProductsScreen() {
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -26,8 +38,17 @@ export default function EditProductsScreen() {
     const { data, error } = await supabase.from('products').select('*');
     if (error) {
       console.error('Erro ao buscar produtos:', error.message);
+      Alert.alert('Erro', 'Não foi possível carregar os produtos.');
     } else {
-      setProducts(data);
+      // Garante que todos os valores para o TextInput sejam strings
+      const formattedData: Product[] = data.map((p: any) => ({
+        ...p,
+        name: String(p.name ?? ''), // Garantindo que o nome é uma string
+        price: String(p.price ?? ''),
+        stock: String(p.stock ?? ''),
+        commission_percentage: String(p.commission_percentage ?? ''),
+      }));
+      setProducts(formattedData);
     }
     setLoading(false);
   };
@@ -43,14 +64,33 @@ export default function EditProductsScreen() {
     }
   }, [success]);
 
+  // 🛠️ Função de alteração de estado imutável
+  const handleChange = (productId: string, field: keyof Product, value: string) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, [field]: value } : p))
+    );
+  };
+
   const handleUpdate = async (productId: string) => {
     const index = products.findIndex((p) => p.id === productId);
     if (index === -1) return;
     const product = products[index];
 
+    // Trata a conversão de strings para números, aceitando vírgula como separador decimal
     const parsedPrice = parseFloat(String(product.price).replace(',', '.'));
     const parsedStock = parseInt(String(product.stock), 10);
-    const parsedCommission = parseFloat(String(product.commission_percentage).replace(',', '.'));
+    const parsedCommission = parseFloat(String(product.commission_percentage || 0).replace(',', '.'));
+
+    if (isNaN(parsedPrice) || isNaN(parsedStock) || isNaN(parsedCommission)) {
+        Alert.alert('Erro', 'Por favor, insira valores numéricos válidos para Preço, Estoque e Comissão.');
+        return;
+    }
+    
+    // Verifica se o nome não está vazio antes de salvar
+    if (!product.name.trim()) {
+        Alert.alert('Erro', 'O nome do produto não pode ser vazio.');
+        return;
+    }
 
     const supabase = createClient();
     const { error } = await supabase
@@ -67,7 +107,7 @@ export default function EditProductsScreen() {
       .eq('id', product.id);
 
     if (error) {
-      Alert.alert('Erro', 'Não foi possível atualizar o produto.');
+      Alert.alert('Erro', 'Não foi possível atualizar o produto. Detalhes: ' + error.message);
     } else {
       setSuccessMessage('Produto atualizado com sucesso!');
       setTimeout(() => setSuccessMessage(''), 3000);
@@ -75,22 +115,32 @@ export default function EditProductsScreen() {
   };
 
   const handleDelete = async (productId: string) => {
-    const supabase = createClient();
-    const { error } = await supabase.from('products').delete().eq('id', productId);
+    Alert.alert(
+      "Confirmar Exclusão",
+      "Tem certeza de que deseja excluir este produto? Esta ação é irreversível.",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel"
+        },
+        { 
+          text: "Excluir", 
+          onPress: async () => {
+            const supabase = createClient();
+            const { error } = await supabase.from('products').delete().eq('id', productId);
 
-    if (error) {
-      console.error('Erro ao excluir produto:', error.message);
-      Alert.alert('Erro', 'Não foi possível excluir o produto.');
-    } else {
-      setSuccessMessage('Produto excluído com sucesso!');
-      setProducts((prev) => prev.filter((p) => p.id !== productId));
-      setTimeout(() => setSuccessMessage(''), 3000);
-    }
-  };
-
-  const handleChange = (productId: string, field: string, value: string) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, [field]: value } : p))
+            if (error) {
+              console.error('Erro ao excluir produto:', error.message);
+              Alert.alert('Erro', 'Não foi possível excluir o produto.');
+            } else {
+              setProducts((prev) => prev.filter((p) => p.id !== productId));
+              setSuccessMessage('Produto excluído com sucesso!');
+              setTimeout(() => setSuccessMessage(''), 3000);
+            }
+          },
+          style: 'destructive'
+        },
+      ]
     );
   };
 
@@ -132,9 +182,10 @@ export default function EditProductsScreen() {
         filteredProducts.map((product) => (
           <View key={product.id} style={styles.card}>
             <Text style={styles.label}>Nome:</Text>
+            {/* 🐛 O componente é vinculado ao estado e ao ID do produto (key) */}
             <TextInput
               style={styles.input}
-              value={product.name}
+              value={String(product.name)} // Garante que o valor é sempre uma string
               onChangeText={(text) => handleChange(product.id, 'name', text)}
             />
 
@@ -196,7 +247,7 @@ export default function EditProductsScreen() {
               <Text style={styles.buttonText}>Salvar Alterações</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.button, { backgroundColor: 'red', marginTop: 8 }]}
+              style={[styles.button, styles.deleteButton]}
               onPress={() => handleDelete(product.id)}
             >
               <Text style={styles.buttonText}>Excluir Produto</Text>
@@ -230,11 +281,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     color: COLORS.text,
   },
+  // 🟢 Estilo da mensagem de sucesso
   successText: {
-    color: 'green',
-    fontWeight: 'bold',
-    marginBottom: 16,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#065f46', // verde escuro
     textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 16,
   },
   noResultsText: {
     color: COLORS.textSecondary,
@@ -265,6 +319,10 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 6,
     alignItems: 'center',
+  },
+  deleteButton: {
+    backgroundColor: 'red',
+    marginTop: 8,
   },
   buttonText: {
     color: '#fff',
